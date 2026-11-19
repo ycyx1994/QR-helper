@@ -15,22 +15,35 @@ export interface Settings {
 
 const DEFAULTS: Settings = {
   theme: 'system',
-  accent: 'green',
+  accent: 'slate',
   sound: true,
   vibrate: true,
   lang: 'auto'
 };
 
 const KEY = 'qrhelper.settings';
+const VER_KEY = 'qrhelper.settings.v';
+const VER = 2;
 
 function load(): Settings {
+  let s: Settings = { ...DEFAULTS };
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { ...DEFAULTS, ...JSON.parse(raw) };
+    if (raw) {
+      s = { ...DEFAULTS, ...JSON.parse(raw) };
+      // v2 迁移：旧默认色 green 会被自动持久化，统一迁到新默认 slate；
+      // 用户显式选过的其他颜色保留。VER_KEY 防止日后显式选 green 被再次迁移。
+      if (localStorage.getItem(VER_KEY) !== String(VER) && s.accent === 'green') {
+        s.accent = 'slate';
+      }
+    }
+    if (localStorage.getItem(VER_KEY) !== String(VER)) {
+      localStorage.setItem(VER_KEY, String(VER));
+    }
   } catch {
     /* 忽略损坏数据 */
   }
-  return { ...DEFAULTS };
+  return s;
 }
 
 function createSettings() {

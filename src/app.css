@@ -6,30 +6,30 @@
 html, body { touch-action: manipulation; overscroll-behavior: none; overflow-x: clip; overflow-wrap: break-word; }
 
 :root {
-  --bg: #F6FAF4;
+  --bg: #F5F7FA;
   --surface: #FFFFFF;
-  --surface-2: #E9F1E4;
-  --text: #171D19;
-  --muted: #5C6A5F;
-  --line: #DDE6D8;
-  --primary: #2E6B3E;
+  --surface-2: #E6ECF3;
+  --text: #161B22;
+  --muted: #566273;
+  --line: #D4DDE8;
+  --primary: #475569;
   --on-primary: #FFFFFF;
-  --primary-c: #B4F0C4;
-  --on-primary-c: #062812;
+  --primary-c: #D7E3F4;
+  --on-primary-c: #0B1D2E;
   --danger: #B3261E;
   --cam-grad: linear-gradient(160deg, #1B242C 0%, #0C1115 100%);
 }
 :root.dark {
-  --bg: #0E1411;
-  --surface: #161E19;
-  --surface-2: #202921;
-  --text: #DCE8DF;
-  --muted: #94A598;
-  --line: #28322B;
-  --primary: #8DDC9F;
-  --on-primary: #0A2B13;
-  --primary-c: #245A31;
-  --on-primary-c: #B4F0C4;
+  --bg: #0D1118;
+  --surface: #141A24;
+  --surface-2: #1E2632;
+  --text: #DBE2EE;
+  --muted: #8E9AB0;
+  --line: #29333F;
+  --primary: #B5C8DD;
+  --on-primary: #1F3242;
+  --primary-c: #2E3F50;
+  --on-primary-c: #D7E3F4;
   --danger: #FFB4AB;
 }
 
@@ -111,7 +111,8 @@ input, textarea, select { font-family: inherit; color: inherit; }
   -webkit-backdrop-filter: blur(14px);
 }
 .appbar .brand { display: flex; align-items: center; gap: 10px; font-size: 21px; font-weight: 700; }
-.brand .logo { width: 34px; height: 34px; border-radius: 11px; background: var(--primary); color: var(--on-primary); display: grid; place-items: center; }
+.brand .logo { width: 34px; height: 34px; border-radius: 11px; background: linear-gradient(150deg, #2E3130 0%, #151716 100%); color: #fff; display: grid; place-items: center; }
+.brand .logo .ic { width: 22px; height: 22px; }
 .icon-btn {
   width: 42px; height: 42px; border-radius: 999px; border: 0;
   background: var(--surface-2); display: grid; place-items: center; color: var(--text);

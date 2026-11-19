@@ -136,13 +136,29 @@ def sheet(icon):
     print("preview ->", PREVIEW)
 
 
+def round_corners(img, radius_ratio=11 / 34):
+    """烘圆角（透明外角），比例与 App 标题 logo 一致。maskable/iOS 图不套用。"""
+    size = img.width
+    s = 4  # 超采样保证边缘平滑
+    mask = Image.new("L", (size * s, size * s), 0)
+    ImageDraw.Draw(mask).rounded_rectangle(
+        [0, 0, size * s - 1, size * s - 1], radius=int(radius_ratio * size * s), fill=255
+    )
+    mask = mask.resize((size, size), Image.LANCZOS)
+    out = img.convert("RGBA")
+    out.putalpha(mask)
+    return out
+
+
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     a = variant()
     sheet(a)
 
-    a.resize((192, 192), Image.LANCZOS).save(f"{OUT_DIR}/icon-192.png")
-    a.resize((512, 512), Image.LANCZOS).save(f"{OUT_DIR}/icon-512.png")
+    round_corners(a).resize((192, 192), Image.LANCZOS) \
+        .save(f"{OUT_DIR}/icon-192.png")
+    round_corners(a).resize((512, 512), Image.LANCZOS) \
+        .save(f"{OUT_DIR}/icon-512.png")
     variant(gscale=0.52).resize((512, 512), Image.LANCZOS) \
         .save(f"{OUT_DIR}/maskable-512.png")
     variant(gscale=0.60).resize((180, 180), Image.LANCZOS) \
