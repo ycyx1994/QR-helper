@@ -2,14 +2,38 @@
   import { _ } from 'svelte-i18n';
   import Icon from '../lib/ui/Icon.svelte';
   import { history, exportCsv, download } from '../lib/history';
+  import { renderToCanvas, renderToPngBlob, renderToSvg } from '../lib/payloads';
   import { detect } from '../lib/actions';
   import { showToast } from '../lib/ui/toast';
   import type { HistoryItem } from '../lib/types';
+
+  let { ongenerate }: { ongenerate: (text: string) => void } = $props();
 
   let search = $state('');
   let selectMode = $state(false);
   let selected = $state(new Set<string>());
   let confirmOpen = $state(false);
+  let qrItem = $state<HistoryItem | null>(null);
+  let qrCanvas = $state<HTMLCanvasElement | undefined>();
+
+  // 浮层打开时渲染该项二维码
+  $effect(() => {
+    const item = qrItem;
+    const canvas = qrCanvas;
+    if (item && canvas) void renderToCanvas(canvas, { bcid: 'qrcode', text: item.text, eclevel: 'M' });
+  });
+
+  async function downloadQrPng() {
+    if (!qrItem) return;
+    const blob = await renderToPngBlob({ bcid: 'qrcode', text: qrItem.text, eclevel: 'M' });
+    if (blob) download(blob, 'qr-helper-qrcode.png');
+  }
+
+  async function downloadQrSvg() {
+    if (!qrItem) return;
+    const svg = await renderToSvg({ bcid: 'qrcode', text: qrItem.text, eclevel: 'M', scale: 4 });
+    if (svg) download(new Blob([svg], { type: 'image/svg+xml' }), 'qr-helper-qrcode.svg');
+  }
 
   const filtered = $derived(
     $history.filter((h) => !search.trim() || h.text.toLowerCase().includes(search.trim().toLowerCase()))
@@ -111,6 +135,9 @@
       </div>
       {#if !selectMode}
         <div class="acts">
+          <button class="act-btn" onclick={() => (qrItem = item)} aria-label={$_('act.makeQr')}>
+            <Icon name="qrGen" cls="ic-sm" />
+          </button>
           <button class="act-btn" onclick={() => copy(item)} aria-label={$_('act.copy')}>
             <Icon name="copy" cls="ic-sm" />
           </button>
@@ -155,6 +182,41 @@
           }}
         >
           {$_('hist.confirm')}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+{#if qrItem}
+  <div
+    class="overlay"
+    role="presentation"
+    onclick={(e) => {
+      if (e.target === e.currentTarget) qrItem = null;
+    }}
+    onkeydown={(e) => {
+      if (e.key === 'Escape') qrItem = null;
+    }}
+  >
+    <div class="dialog qr-dialog" role="dialog" aria-modal="true" tabindex="-1">
+      <h3>{$_('hist.qrTitle')}</h3>
+      <div class="qr-dialog-body">
+        <canvas bind:this={qrCanvas} width="220" height="220"></canvas>
+      </div>
+      <div class="row">
+        <button class="btn btn-tonal" style="flex:1" onclick={downloadQrPng}>{$_('hist.qrDownloadPng')}</button>
+        <button class="btn btn-tonal" style="flex:1" onclick={downloadQrSvg}>{$_('hist.qrDownloadSvg')}</button>
+        <button
+          class="btn btn-fill"
+          style="flex:1"
+          onclick={() => {
+            const text = qrItem!.text;
+            qrItem = null;
+            ongenerate(text);
+          }}
+        >
+          {$_('hist.qrEdit')}
         </button>
       </div>
     </div>

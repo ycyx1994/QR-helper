@@ -302,6 +302,15 @@ input, textarea, select { font-family: inherit; color: inherit; }
 .dialog p { font-size: 14px; color: var(--muted); line-height: 1.6; }
 .dialog .row { justify-content: flex-end; margin-top: 20px; }
 
+/* 历史二维码浮层 */
+.qr-dialog-body {
+  display: flex; justify-content: center; padding: 8px 0 2px;
+}
+.qr-dialog-body canvas {
+  width: 220px; height: 220px;
+  background: #fff; border-radius: 16px; padding: 8px;
+}
+
 .toast {
   position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom)); transform: translateX(-50%);
   background: var(--text); color: var(--bg); padding: 12px 20px; border-radius: 14px; font-size: 13.5px;
@@ -309,15 +318,76 @@ input, textarea, select { font-family: inherit; color: inherit; }
   max-width: calc(100vw - 32px); overflow-wrap: anywhere; text-align: center;
 }
 
-/* ===== 桌面响应式 ===== */
+/* ===== 桌面响应式（≥1024px）：左侧收缩导航 + 分栏布局 ===== */
 @media (min-width: 1024px) {
-  .content { max-width: 1100px; margin: 0 auto; width: 100%; }
+  /* 左侧固定导航栏：收起 72px 图标栏，hover 展开 232px */
+  .app { padding-left: 96px; }
   .nav {
-    left: 50%; transform: translateX(-50%); width: 520px; right: auto;
-    bottom: calc(18px + env(safe-area-inset-bottom));
+    left: 14px; top: 14px; right: auto; bottom: auto;
+    width: 72px; height: auto;
+    flex-direction: column; justify-content: flex-start; align-items: stretch;
+    gap: 6px; padding: 8px; border-radius: 22px;
+    transition: width .25s cubic-bezier(.2, .8, .2, 1);
   }
+  .nav:hover { width: 156px; }
+  .nav .item {
+    width: 100%; height: 52px;
+    flex-direction: row; align-items: center;
+    gap: 0; padding: 0 8px; border-radius: 16px;
+    font-size: 13px; font-weight: 500;
+    transition: gap .25s cubic-bezier(.2, .8, .2, 1);
+  }
+  .nav:hover .item { gap: 12px; }
+  .nav .item .pill { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 12px; }
+  .nav .item .lbl {
+    max-width: 0; opacity: 0; overflow: hidden; white-space: nowrap;
+    transition: max-width .25s cubic-bezier(.2, .8, .2, 1), opacity .18s ease;
+  }
+  .nav:hover .item .lbl { max-width: 72px; opacity: 1; }
+
+  .content {
+    max-width: 1180px; margin: 0 auto; width: 100%;
+    box-sizing: border-box; padding: 8px 28px 48px;
+  }
+  .toast { bottom: 28px; }
+
+  /* 分栏：左=表单/取景框，右=预览/结果（sticky 跟随） */
+  .two-col {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0 20px; align-items: start;
+  }
+  .two-col .tc-left, .two-col .tc-right { min-width: 0; }
+  .two-col .tc-left > *, .two-col .tc-right > * { margin-left: 0; margin-right: 0; }
+  .two-col .chips, .two-col .row { padding-left: 0 !important; padding-right: 0 !important; }
+  .tc-sticky { position: sticky; top: 76px; }
+
   .cam.open { height: 430px; }
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; align-items: start; }
+
+  /* 历史：卡片流 → 表格式行 */
+  .hist { border-radius: 16px; margin: 8px 16px 0; padding: 12px 16px; }
+  .hist .info {
+    display: grid; grid-template-columns: minmax(0, 1fr) 150px 104px;
+    gap: 0 12px; align-items: center;
+  }
+  .hist .info .t1 { grid-column: 1; grid-row: 1; margin-top: 0 !important; }
+  .hist .info .row { grid-column: 2; grid-row: 1; margin: 0; }
+  .hist .info .t2 { grid-column: 3; grid-row: 1; margin-top: 0; text-align: right; }
+}
+
+/* ---- 指针设备 hover 反馈 ---- */
+@media (hover: hover) {
+  .chip:hover { background: var(--surface-2); }
+  .seg button:hover { background: var(--surface-2); }
+  .nav .item:hover { background: var(--surface); }
+  .btn-fill:hover { filter: brightness(1.06); }
+  .btn-tonal:hover { filter: brightness(.97); }
+  .btn-ghost:hover { background: var(--surface-2); }
+  .btn-text:hover { background: var(--surface-2); }
+  .icon-btn:hover { background: var(--surface-2); }
+  .act-btn:hover { background: var(--surface-2); }
+  .g-row:hover { background: var(--surface-2); }
+  .hist:hover { background: var(--surface-2); }
+  .glass:hover { background: rgba(255, 255, 255, .22); }
 }
 
 /* ---- 全局交互修正：消除移动端默认按钮方块与灰色 tap 高亮，补按压动效 ---- */

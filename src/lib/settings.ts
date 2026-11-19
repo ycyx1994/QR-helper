@@ -10,6 +10,7 @@ export interface Settings {
   accent: AccentPreset;
   sound: boolean;
   vibrate: boolean;
+  autoCamera: boolean;
   lang: LangPref;
 }
 
@@ -18,6 +19,8 @@ const DEFAULTS: Settings = {
   accent: 'slate',
   sound: true,
   vibrate: true,
+  // 扫码页自动开相机：手机默认开，PC（≥1024px）默认关
+  autoCamera: typeof window === 'undefined' || !window.matchMedia('(min-width: 1024px)').matches,
   lang: 'auto'
 };
 

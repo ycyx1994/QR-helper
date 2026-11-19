@@ -119,6 +119,9 @@
   }
 </script>
 
+<div class="two-col">
+<div class="tc-left">
+
 <div class="chips">
   {#each payloadTypes as pt (pt.id)}
     <button class="chip" class:on={type === pt.id} onclick={() => setType(pt.id)}>
@@ -245,6 +248,10 @@
   </div>
 {/if}
 
+</div>
+
+<div class="tc-right tc-sticky">
+
 {#if payloadText.trim()}
   <div class="qr-card">
     <canvas bind:this={canvasEl} width="336" height="336"></canvas>
@@ -267,4 +274,6 @@
   <button class="btn btn-tonal btn-icon" disabled={!payloadText.trim()} onclick={copyText} aria-label={$_('gen.copyText')}>
     <Icon name="copy" cls="ic-sm" />
   </button>
+</div>
+</div>
 </div>

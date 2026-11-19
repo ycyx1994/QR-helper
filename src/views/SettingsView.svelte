@@ -45,6 +45,9 @@
   }
 </script>
 
+<div class="two-col">
+<div class="tc-left">
+
 <div class="group-label">{$_('set.appearance')}</div>
 <div class="group">
   <div class="g-row">
@@ -85,6 +88,12 @@
       <Switch on={$settings.vibrate} label={$_('set.vibrate')} onchange={(v) => settings.update((s) => ({ ...s, vibrate: v }))} />
     </div>
   </div>
+  <div class="g-row">
+    <div class="gl">{$_('set.autoCamera')}</div>
+    <div class="gr">
+      <Switch on={$settings.autoCamera} label={$_('set.autoCamera')} onchange={(v) => settings.update((s) => ({ ...s, autoCamera: v }))} />
+    </div>
+  </div>
 </div>
 
 <div class="group-label">{$_('set.language')}</div>
@@ -100,6 +109,10 @@
     </div>
   </div>
 </div>
+
+</div>
+
+<div class="tc-right">
 
 <div class="group-label">{$_('set.data')}</div>
 <div class="group">
@@ -133,6 +146,8 @@
     <div class="gr"><span class="badge">{$_('set.privacyValue')}</span></div>
   </div>
   <div class="g-row"><div class="gl">{$_('set.license')}</div><div class="gr">MIT</div></div>
+</div>
+</div>
 </div>
 
 {#if confirmOpen}

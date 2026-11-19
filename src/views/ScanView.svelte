@@ -10,6 +10,7 @@
   import { showToast } from '../lib/ui/toast';
   import type { ScanResult } from '../lib/types';
   import { get } from 'svelte/store';
+  import { pendingImage } from '../lib/paste';
 
   let { ongenerate }: { ongenerate: (text: string) => void } = $props();
 
@@ -42,8 +43,15 @@
 
   // 打开页面时：相机权限已授权 → 自动开扫（未授权保持手动，避免突然弹出授权框）
   onMount(() => {
+    // 消费全局粘贴的图片（App 捕获后经 pendingImage 传递）
+    const pasted = get(pendingImage);
+    if (pasted) {
+      pendingImage.set(null);
+      void decodeFile(pasted);
+    }
     void (async () => {
       if (!window.isSecureContext) return;
+      if (!get(settings).autoCamera) return;
       try {
         const status = await navigator.permissions.query({ name: 'camera' as PermissionName });
         if (status.state === 'granted') await start();
@@ -233,6 +241,9 @@
 
 <svelte:window onpaste={onPaste} />
 
+<div class="two-col">
+<div class="tc-left">
+
 <div
   class="cam"
   class:open={scanning}
@@ -285,6 +296,9 @@
   </div>
 </div>
 
+</div>
+
+<div class="tc-right tc-sticky">
 {#if result && detected}
   <div class="card">
     <div class="row" style="justify-content:space-between">
@@ -339,3 +353,5 @@
     <div class="result-text" style="color:var(--muted);font-family:inherit">{$_('scan.empty')}</div>
   </div>
 {/if}
+</div>
+</div>

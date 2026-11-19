@@ -8,12 +8,14 @@
   import { toast, showToast } from './lib/ui/toast';
   import { settings } from './lib/settings';
   import { deferredPrompt, isStandalone, isIosSafari, promptInstall } from './lib/pwa';
+  import { pendingImage } from './lib/paste';
 
   type Tab = 'scan' | 'generate' | 'history' | 'settings';
 
   function tabFromUrl(): Tab {
     const t = new URL(location.href).searchParams.get('tab');
-    return t === 'generate' || t === 'history' || t === 'settings' ? t : 'scan';
+    if (t === 'scan' || t === 'generate' || t === 'history' || t === 'settings') return t;
+    return window.matchMedia('(min-width: 1024px)').matches ? 'generate' : 'scan';
   }
 
   let tab: Tab = $state(tabFromUrl());
@@ -55,6 +57,21 @@
     return () => window.removeEventListener('popstate', onPop);
   });
 
+  // 任意页面粘贴图片 → 送扫码页识别
+  $effect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      if (tab === 'scan') return;
+      const item = [...(e.clipboardData?.items ?? [])].find((it) => it.type.startsWith('image/'));
+      const f = item?.getAsFile();
+      if (f) {
+        pendingImage.set(f);
+        navigate('scan');
+      }
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  });
+
   function toggleTheme() {
     settings.update((s) => {
       const darkNow = document.documentElement.classList.contains('dark');
@@ -64,12 +81,17 @@
 
   const dark = $derived(document.documentElement.classList.contains('dark'));
 
-  const tabs: { id: Tab; icon: string; labelKey: string }[] = [
+  const tabDefs = [
     { id: 'scan', icon: 'camera', labelKey: 'tab.scan' },
     { id: 'generate', icon: 'qrGen', labelKey: 'tab.generate' },
     { id: 'history', icon: 'history', labelKey: 'tab.history' },
     { id: 'settings', icon: 'gear', labelKey: 'tab.settings' }
-  ];
+  ] as const;
+  // 桌面侧边栏顺序：生成 / 扫码 / 历史 / 设置（1-4 快捷键随显示顺序）
+  const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
+  const tabs: (typeof tabDefs)[number][] = isDesktop
+    ? [tabDefs[1], tabDefs[0], tabDefs[2], tabDefs[3]]
+    : [...tabDefs];
 </script>
 
 <div class="app">
@@ -105,7 +127,7 @@
     {:else if tab === 'generate'}
       <GenerateView initialText={genText} />
     {:else if tab === 'history'}
-      <HistoryView />
+      <HistoryView ongenerate={(text) => navigate('generate', text)} />
     {:else}
       <SettingsView />
     {/if}
@@ -115,7 +137,7 @@
     {#each tabs as t (t.id)}
       <button class="item" class:on={tab === t.id} onclick={() => navigate(t.id)}>
         <div class="pill"><Icon name={t.icon} /></div>
-        {$_(t.labelKey)}
+        <span class="lbl">{$_(t.labelKey)}</span>
       </button>
     {/each}
   </nav>
