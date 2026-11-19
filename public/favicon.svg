@@ -1,35 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <defs>
     <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#45935B"/><stop offset="1" stop-color="#1E4D2E"/>
+      <stop offset="0" stop-color="#2E3130"/><stop offset="1" stop-color="#151716"/>
     </linearGradient>
   </defs>
   <rect width="64" height="64" rx="14" fill="url(#g)"/>
-  <g fill="none" stroke="#FFFFFF" stroke-width="3.4">
-    <rect x="10" y="10" width="15" height="15" rx="4.2"/>
-    <rect x="39" y="10" width="15" height="15" rx="4.2"/>
-    <rect x="10" y="39" width="15" height="15" rx="4.2"/>
+  <g fill="none" stroke="#FFFFFF" stroke-width="2.6">
+    <rect x="11" y="11" width="13.5" height="13.5" rx="3.6"/>
+    <rect x="39.5" y="11" width="13.5" height="13.5" rx="3.6"/>
+    <rect x="11" y="39.5" width="13.5" height="13.5" rx="3.6"/>
   </g>
   <g fill="#FFFFFF">
-    <rect x="15" y="15" width="5" height="5" rx="1.6"/>
-    <rect x="44" y="15" width="5" height="5" rx="1.6"/>
-    <rect x="15" y="44" width="5" height="5" rx="1.6"/>
-    <rect x="30" y="10" width="3.4" height="3.4" rx="1.1"/>
-    <rect x="30" y="17" width="3.4" height="3.4" rx="1.1"/>
-    <rect x="30" y="24" width="3.4" height="3.4" rx="1.1"/>
-    <rect x="39" y="30" width="3.4" height="3.4" rx="1.1"/>
-    <rect x="46" y="30" width="3.4" height="3.4" rx="1.1"/>
-    <rect x="53" y="30" width="3.4" height="3.4" rx="1.1"/>
-    <rect x="30" y="33" width="3.4" height="3.4" rx="1.1"/>
-    <rect x="37" y="37" width="5.5" height="3.4" rx="1.1"/>
-    <rect x="47" y="37" width="3.4" height="3.4" rx="1.1"/>
-    <rect x="30" y="43" width="5.5" height="3.4" rx="1.1"/>
-    <rect x="40" y="43" width="3.4" height="3.4" rx="1.1"/>
-    <rect x="47" y="43" width="6.5" height="3.4" rx="1.1"/>
-    <rect x="37" y="49" width="3.4" height="3.4" rx="1.1"/>
-    <rect x="44" y="49" width="8" height="3.4" rx="1.1"/>
-    <rect x="30" y="55" width="5.5" height="3.4" rx="1.1"/>
-    <rect x="40" y="55" width="3.4" height="3.4" rx="1.1"/>
-    <rect x="48" y="55" width="5.5" height="3.4" rx="1.1"/>
+    <rect x="15.2" y="15.2" width="5.1" height="5.1" rx="1.5"/>
+    <rect x="43.7" y="15.2" width="5.1" height="5.1" rx="1.5"/>
+    <rect x="15.2" y="43.7" width="5.1" height="5.1" rx="1.5"/>
+    <rect x="31" y="31" width="3.1" height="3.1" rx="1"/>
+    <rect x="36.6" y="36.6" width="2.3" height="2.3" rx="0.8"/>
+    <rect x="43.7" y="43.7" width="3.1" height="3.1" rx="1"/>
+    <rect x="48.1" y="48.1" width="2.1" height="2.1" rx="0.7"/>
+    <rect x="45.3" y="36.6" width="2.3" height="2.3" rx="0.8"/>
   </g>
 </svg>
