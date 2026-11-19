@@ -15,7 +15,7 @@ export default defineConfig({
     ...(https ? [basicSsl()] : []),
     svelte(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       // manifest 由 public/ 静态双语文件提供（zh-CN / en 运行时切换 link）
       manifest: false,
       includeAssets: ['icons/*.png', 'favicon.svg', 'manifest.zh-CN.webmanifest', 'manifest.en.webmanifest'],

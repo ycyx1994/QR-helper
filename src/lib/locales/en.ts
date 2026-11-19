@@ -121,10 +121,15 @@ export default {
   'set.records': '{count} records',
   'set.about': 'About',
   'set.version': 'Version',
+  'set.update': 'Software update',
+  'set.updateCheck': 'Check for updates',
+  'set.checking': 'Checking…',
+  'set.updateNow': 'Update now',
   'set.engine': 'Decode engine',
   'set.privacy': 'Privacy',
   'set.privacyValue': 'Runs fully offline. Zero network requests. Data never leaves your device.',
   'set.license': 'License',
+  'set.github': 'GitHub project',
   'set.installApp': 'Install app',
   'set.installed': 'Installed',
 
@@ -141,5 +146,7 @@ export default {
   'toast.installDone': 'Added to home screen',
   'toast.installCancel': 'Install cancelled',
   'toast.installNoPrompt': 'No install prompt here — use the browser menu to install',
+  'toast.updateFound': 'New version found, tap Update now',
+  'toast.upToDate': 'Already up to date',
   'toast.saved': 'Saved'
 } as const;

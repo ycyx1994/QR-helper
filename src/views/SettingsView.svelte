@@ -6,7 +6,15 @@
   import { switchLang, type LangPref } from '../lib/i18n';
   import { history, exportCsv } from '../lib/history';
   import { showToast } from '../lib/ui/toast';
-  import { isStandalone, isIosSafari, promptInstall } from '../lib/pwa';
+  import {
+    isStandalone,
+    isIosSafari,
+    promptInstall,
+    updateAvailable,
+    updateChecking,
+    checkForUpdate,
+    applyUpdate
+  } from '../lib/pwa';
 
   let confirmOpen = $state(false);
 
@@ -138,6 +146,28 @@
   </button>
   <div class="g-row"><div class="gl">{$_('set.version')}</div><div class="gr">v0.1.0</div></div>
   <div class="g-row">
+    <div class="gl">{$_('set.update')}</div>
+    <div class="gr">
+      {#if $updateAvailable}
+        <button class="btn btn-fill" style="height:34px;padding:0 16px" onclick={applyUpdate}>
+          {$_('set.updateNow')}
+        </button>
+      {:else}
+        <button
+          class="btn btn-tonal"
+          style="height:34px;padding:0 16px"
+          disabled={$updateChecking}
+          onclick={async () => {
+            const found = await checkForUpdate();
+            showToast(found ? $_('toast.updateFound') : $_('toast.upToDate'));
+          }}
+        >
+          {$updateChecking ? $_('set.checking') : $_('set.updateCheck')}
+        </button>
+      {/if}
+    </div>
+  </div>
+  <div class="g-row">
     <div class="gl">{$_('set.engine')}</div>
     <div class="gr">zxing-wasm 3.1.7 · bwip-js 4.11.4</div>
   </div>
@@ -146,6 +176,13 @@
     <div class="gr"><span class="badge">{$_('set.privacyValue')}</span></div>
   </div>
   <div class="g-row"><div class="gl">{$_('set.license')}</div><div class="gr">MIT</div></div>
+  <button
+    class="g-row"
+    onclick={() => window.open('https://github.com/ycyx1994/QR-helper', '_blank', 'noopener,noreferrer')}
+  >
+    <div class="gl">{$_('set.github')}</div>
+    <div class="gr">ycyx1994/QR-helper <Icon name="external" cls="ic-sm" /></div>
+  </button>
 </div>
 </div>
 </div>

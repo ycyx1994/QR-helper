@@ -121,10 +121,15 @@ export default {
   'set.records': '{count} 条记录',
   'set.about': '关于',
   'set.version': '版本',
+  'set.update': '软件更新',
+  'set.updateCheck': '检查更新',
+  'set.checking': '检查中…',
+  'set.updateNow': '立即更新',
   'set.engine': '解码引擎',
   'set.privacy': '隐私',
   'set.privacyValue': '纯本地运行，零网络请求，数据不离开本机',
   'set.license': '许可证',
+  'set.github': 'GitHub 项目',
   'set.installApp': '安装应用',
   'set.installed': '已安装',
 
@@ -141,5 +146,7 @@ export default {
   'toast.installDone': '已添加到主屏幕',
   'toast.installCancel': '已取消安装',
   'toast.installNoPrompt': '此浏览器未提供安装入口，可用浏览器菜单安装',
+  'toast.updateFound': '发现新版本，点击「立即更新」',
+  'toast.upToDate': '已是最新版本',
   'toast.saved': '已保存'
 } as const;
