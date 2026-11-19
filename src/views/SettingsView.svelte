@@ -6,6 +6,7 @@
   import { switchLang, type LangPref } from '../lib/i18n';
   import { history, exportCsv } from '../lib/history';
   import { showToast } from '../lib/ui/toast';
+  import { isStandalone, isIosSafari, promptInstall } from '../lib/pwa';
 
   let confirmOpen = $state(false);
 
@@ -28,6 +29,19 @@
   function doExport() {
     exportCsv($history);
     showToast($_('toast.exported'));
+  }
+
+  const installed = isStandalone();
+
+  async function doInstall() {
+    if (isStandalone()) {
+      showToast($_('set.installed'));
+      return;
+    }
+    const r = await promptInstall();
+    if (r === 'accepted') showToast($_('toast.installDone'));
+    else if (r === 'dismissed') showToast($_('toast.installCancel'));
+    else showToast(isIosSafari() ? $_('install.ios') : $_('toast.installNoPrompt'), 3600);
   }
 </script>
 
@@ -105,6 +119,10 @@
 
 <div class="group-label">{$_('set.about')}</div>
 <div class="group">
+  <button class="g-row" onclick={doInstall}>
+    <div class="gl">{$_('set.installApp')}</div>
+    <div class="gr">{#if installed}<span class="badge">{$_('set.installed')}</span>{:else}<Icon name="download" cls="ic-sm" />{/if}</div>
+  </button>
   <div class="g-row"><div class="gl">{$_('set.version')}</div><div class="gr">v0.1.0</div></div>
   <div class="g-row">
     <div class="gl">{$_('set.engine')}</div>

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n';
-  import { onDestroy } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import Icon from '../lib/ui/Icon.svelte';
   import { decoder } from '../lib/decoder';
   import { history, download } from '../lib/history';
@@ -28,6 +28,7 @@
   let rafId = 0;
   let lastTick = 0;
   let busy = false;
+  let starting = false;
   let lastText = '';
   let lastAt = 0;
   let audioCtx: AudioContext | null = null;
@@ -39,32 +40,51 @@
     .then(() => (engineReady = true))
     .catch(() => (engineReady = true));
 
+  // 打开页面时：相机权限已授权 → 自动开扫（未授权保持手动，避免突然弹出授权框）
+  onMount(() => {
+    void (async () => {
+      if (!window.isSecureContext) return;
+      try {
+        const status = await navigator.permissions.query({ name: 'camera' as PermissionName });
+        if (status.state === 'granted') await start();
+      } catch {
+        /* 权限查询不可用（旧 Safari 等）：保持手动开启 */
+      }
+    })();
+  });
+
   async function start() {
-    camError = false;
-    camErrKind = null;
-    if (!window.isSecureContext) {
-      camError = true;
-      camErrKind = 'insecure';
-      return;
-    }
+    if (starting || stream) return;
+    starting = true;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } },
-        audio: false
-      });
-      if (!videoEl) return;
-      videoEl.srcObject = stream;
-      await videoEl.play();
-      scanning = true;
-      const track = stream.getVideoTracks()[0];
-      const caps = (track.getCapabilities?.() ?? {}) as MediaTrackCapabilities & { torch?: boolean };
-      torchCap = !!caps.torch;
-      rafId = requestAnimationFrame(tick);
-    } catch (e) {
-      const name = (e as DOMException)?.name ?? '';
-      camErrKind = name === 'NotAllowedError' || name === 'SecurityError' ? 'denied' : 'missing';
-      camError = true;
-      scanning = false;
+      camError = false;
+      camErrKind = null;
+      if (!window.isSecureContext) {
+        camError = true;
+        camErrKind = 'insecure';
+        return;
+      }
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } },
+          audio: false
+        });
+        if (!videoEl) return;
+        videoEl.srcObject = stream;
+        await videoEl.play();
+        scanning = true;
+        const track = stream.getVideoTracks()[0];
+        const caps = (track.getCapabilities?.() ?? {}) as MediaTrackCapabilities & { torch?: boolean };
+        torchCap = !!caps.torch;
+        rafId = requestAnimationFrame(tick);
+      } catch (e) {
+        const name = (e as DOMException)?.name ?? '';
+        camErrKind = name === 'NotAllowedError' || name === 'SecurityError' ? 'denied' : 'missing';
+        camError = true;
+        scanning = false;
+      }
+    } finally {
+      starting = false;
     }
   }
 

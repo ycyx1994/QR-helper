@@ -5,8 +5,9 @@
   import GenerateView from './views/GenerateView.svelte';
   import HistoryView from './views/HistoryView.svelte';
   import SettingsView from './views/SettingsView.svelte';
-  import { toast } from './lib/ui/toast';
+  import { toast, showToast } from './lib/ui/toast';
   import { settings } from './lib/settings';
+  import { deferredPrompt, isStandalone, isIosSafari, promptInstall } from './lib/pwa';
 
   type Tab = 'scan' | 'generate' | 'history' | 'settings';
 
@@ -17,6 +18,27 @@
 
   let tab: Tab = $state(tabFromUrl());
   let genText = $state('');
+  let installDismissed = $state(localStorage.getItem('qrhelper.installDismissed') === '1');
+
+  const showInstallBanner = $derived(
+    !installDismissed && !isStandalone() && ($deferredPrompt !== null || isIosSafari())
+  );
+
+  async function installApp() {
+    if (isStandalone()) {
+      showToast($_('set.installed'));
+      return;
+    }
+    const r = await promptInstall();
+    if (r === 'accepted') showToast($_('toast.installDone'));
+    else if (r === 'dismissed') showToast($_('toast.installCancel'));
+    else showToast(isIosSafari() ? $_('install.ios') : $_('toast.installNoPrompt'), 3600);
+  }
+
+  function dismissInstall() {
+    installDismissed = true;
+    localStorage.setItem('qrhelper.installDismissed', '1');
+  }
 
   function navigate(t: Tab, prefill?: string) {
     tab = t;
@@ -60,6 +82,22 @@
       <Icon name={dark ? 'sun' : 'moon'} />
     </button>
   </header>
+
+  {#if showInstallBanner}
+    <div class="install-banner">
+      <div class="ib-icon"><Icon name="download" /></div>
+      <div class="ib-text">
+        <strong>{$_('install.title')}</strong>
+        <span>{$deferredPrompt ? $_('install.desc') : $_('install.ios')}</span>
+      </div>
+      {#if $deferredPrompt}
+        <button class="btn btn-fill ib-cta" onclick={installApp}>{$_('install.cta')}</button>
+      {/if}
+      <button class="ib-x" onclick={dismissInstall} aria-label={$_('install.dismiss')}>
+        <Icon name="x" cls="ic-sm" />
+      </button>
+    </div>
+  {/if}
 
   <main class="content">
     {#if tab === 'scan'}

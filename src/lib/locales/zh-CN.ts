@@ -120,10 +120,21 @@ export default {
   'set.privacy': '隐私',
   'set.privacyValue': '纯本地运行，零网络请求，数据不离开本机',
   'set.license': '许可证',
+  'set.installApp': '安装应用',
+  'set.installed': '已安装',
+
+  'install.title': '安装到主屏幕',
+  'install.desc': '离线可用，秒开，全屏体验',
+  'install.cta': '安装',
+  'install.dismiss': '关闭',
+  'install.ios': 'Safari 中点「分享」按钮，选「添加到主屏幕」',
 
   'toast.copied': '已复制到剪贴板',
   'toast.deleted': '已删除',
   'toast.exported': '已导出 CSV',
   'toast.imageFail': '图片中未识别到码',
+  'toast.installDone': '已添加到主屏幕',
+  'toast.installCancel': '已取消安装',
+  'toast.installNoPrompt': '此浏览器未提供安装入口，可用浏览器菜单安装',
   'toast.saved': '已保存'
 } as const;

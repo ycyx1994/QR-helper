@@ -120,10 +120,21 @@ export default {
   'set.privacy': 'Privacy',
   'set.privacyValue': 'Runs fully offline. Zero network requests. Data never leaves your device.',
   'set.license': 'License',
+  'set.installApp': 'Install app',
+  'set.installed': 'Installed',
+
+  'install.title': 'Add to Home Screen',
+  'install.desc': 'Works offline, opens instantly, full-screen',
+  'install.cta': 'Install',
+  'install.dismiss': 'Dismiss',
+  'install.ios': 'In Safari, tap Share and choose "Add to Home Screen"',
 
   'toast.copied': 'Copied to clipboard',
   'toast.deleted': 'Deleted',
   'toast.exported': 'CSV exported',
   'toast.imageFail': 'No code found in the image',
+  'toast.installDone': 'Added to home screen',
+  'toast.installCancel': 'Install cancelled',
+  'toast.installNoPrompt': 'No install prompt here — use the browser menu to install',
   'toast.saved': 'Saved'
 } as const;

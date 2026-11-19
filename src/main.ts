@@ -5,8 +5,10 @@ import App from './App.svelte';
 import { setupI18n } from './lib/i18n';
 import { settings } from './lib/settings';
 import { registerSW } from 'virtual:pwa-register';
+import { initInstallPrompt } from './lib/pwa';
 
 setupI18n(get(settings).lang);
+initInstallPrompt();
 
 const app = mount(App, { target: document.getElementById('app')! });
 
