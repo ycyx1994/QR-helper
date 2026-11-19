@@ -1,0 +1,32 @@
+{
+  "name": "QR Helper - Barcode Scanner & Generator",
+  "short_name": "QR Helper",
+  "description": "Fully local barcode/QR scanner and generator with offline PWA support",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F6FAF4",
+  "theme_color": "#2E6B3E",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Scan barcode",
+      "short_name": "Scan",
+      "url": "./?tab=scan",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Create barcode",
+      "short_name": "Create",
+      "url": "./?tab=generate",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

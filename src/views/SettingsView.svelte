@@ -1,0 +1,149 @@
+<script lang="ts">
+  import { _ } from 'svelte-i18n';
+  import Icon from '../lib/ui/Icon.svelte';
+  import Switch from '../lib/ui/Switch.svelte';
+  import { settings, type ThemePref, type AccentPreset } from '../lib/settings';
+  import { switchLang, type LangPref } from '../lib/i18n';
+  import { history, exportCsv } from '../lib/history';
+  import { showToast } from '../lib/ui/toast';
+
+  let confirmOpen = $state(false);
+
+  const accents: { id: AccentPreset; color: string }[] = [
+    { id: 'green', color: '#2E6B3E' },
+    { id: 'blue', color: '#1D4ED8' },
+    { id: 'violet', color: '#6D28D9' },
+    { id: 'pink', color: '#BE185D' },
+    { id: 'orange', color: '#C2410C' },
+    { id: 'slate', color: '#475569' }
+  ];
+
+  function setTheme(theme: ThemePref) {
+    settings.update((s) => ({ ...s, theme }));
+  }
+  function setLang(lang: LangPref) {
+    settings.update((s) => ({ ...s, lang }));
+    switchLang(lang);
+  }
+  function doExport() {
+    exportCsv($history);
+    showToast($_('toast.exported'));
+  }
+</script>
+
+<div class="group-label">{$_('set.appearance')}</div>
+<div class="group">
+  <div class="g-row">
+    <div class="gl">{$_('set.theme')}</div>
+    <div class="gr" style="flex:0 0 auto">
+      <div class="seg" style="width:220px;margin:0">
+        <button class:on={$settings.theme === 'light'} onclick={() => setTheme('light')}>{$_('set.theme.light')}</button>
+        <button class:on={$settings.theme === 'dark'} onclick={() => setTheme('dark')}>{$_('set.theme.dark')}</button>
+        <button class:on={$settings.theme === 'system'} onclick={() => setTheme('system')}>{$_('set.theme.system')}</button>
+      </div>
+    </div>
+  </div>
+  <div class="g-row"><div class="gl">{$_('set.accent')}</div></div>
+  <div class="swatch-row">
+    {#each accents as a (a.id)}
+      <button
+        class="sw"
+        class:on={$settings.accent === a.id}
+        style="background:{a.color}"
+        aria-label={a.id}
+        onclick={() => settings.update((s) => ({ ...s, accent: a.id }))}
+      ></button>
+    {/each}
+  </div>
+</div>
+
+<div class="group-label">{$_('set.feedback')}</div>
+<div class="group">
+  <div class="g-row">
+    <div class="gl">{$_('set.sound')}</div>
+    <div class="gr">
+      <Switch on={$settings.sound} label={$_('set.sound')} onchange={(v) => settings.update((s) => ({ ...s, sound: v }))} />
+    </div>
+  </div>
+  <div class="g-row">
+    <div class="gl">{$_('set.vibrate')}</div>
+    <div class="gr">
+      <Switch on={$settings.vibrate} label={$_('set.vibrate')} onchange={(v) => settings.update((s) => ({ ...s, vibrate: v }))} />
+    </div>
+  </div>
+</div>
+
+<div class="group-label">{$_('set.language')}</div>
+<div class="group">
+  <div class="g-row">
+    <div class="gl">{$_('set.language')}</div>
+    <div class="gr" style="flex:0 0 auto">
+      <div class="seg" style="width:250px;margin:0">
+        <button class:on={$settings.lang === 'auto'} onclick={() => setLang('auto')}>{$_('set.lang.auto')}</button>
+        <button class:on={$settings.lang === 'zh-CN'} onclick={() => setLang('zh-CN')}>中文</button>
+        <button class:on={$settings.lang === 'en'} onclick={() => setLang('en')}>English</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="group-label">{$_('set.data')}</div>
+<div class="group">
+  <div class="g-row">
+    <div class="gl">{$_('set.storage')}</div>
+    <div class="gr">{$_('set.records', { values: { count: $history.length } })}</div>
+  </div>
+  <button class="g-row" onclick={doExport}>
+    <div class="gl">{$_('hist.exportCsv')}</div>
+    <div class="gr"><Icon name="download" cls="ic-sm" /></div>
+  </button>
+  <button class="g-row" onclick={() => (confirmOpen = true)}>
+    <div class="gl" style="color:var(--danger)">{$_('hist.clear')}</div>
+    <div class="gr" style="color:var(--danger)"><Icon name="trash" cls="ic-sm" /></div>
+  </button>
+</div>
+
+<div class="group-label">{$_('set.about')}</div>
+<div class="group">
+  <div class="g-row"><div class="gl">{$_('set.version')}</div><div class="gr">v0.1.0</div></div>
+  <div class="g-row">
+    <div class="gl">{$_('set.engine')}</div>
+    <div class="gr">zxing-wasm 3.1.7 · bwip-js 4.11.4</div>
+  </div>
+  <div class="g-row">
+    <div class="gl">{$_('set.privacy')}</div>
+    <div class="gr"><span class="badge">{$_('set.privacyValue')}</span></div>
+  </div>
+  <div class="g-row"><div class="gl">{$_('set.license')}</div><div class="gr">MIT</div></div>
+</div>
+
+{#if confirmOpen}
+  <div
+    class="overlay"
+    role="presentation"
+    onclick={(e) => {
+      if (e.target === e.currentTarget) confirmOpen = false;
+    }}
+    onkeydown={(e) => {
+      if (e.key === 'Escape') confirmOpen = false;
+    }}
+  >
+    <div class="dialog" role="alertdialog" aria-modal="true" tabindex="-1">
+      <h3>{$_('hist.clear')}</h3>
+      <p>{$_('hist.confirmClear', { values: { count: $history.length } })}</p>
+      <div class="row">
+        <button class="btn btn-text" onclick={() => (confirmOpen = false)}>{$_('hist.cancel')}</button>
+        <button
+          class="btn btn-solid-danger"
+          onclick={() => {
+            history.clear();
+            confirmOpen = false;
+            showToast($_('toast.deleted'));
+          }}
+        >
+          {$_('hist.confirm')}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}

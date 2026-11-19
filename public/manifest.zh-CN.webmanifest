@@ -1,0 +1,32 @@
+{
+  "name": "QR Helper - 二维码扫描与生成",
+  "short_name": "QR Helper",
+  "description": "纯本地运行的二维码/条形码扫描与生成工具，支持 PWA 离线使用",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F6FAF4",
+  "theme_color": "#2E6B3E",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "扫描二维码",
+      "short_name": "扫码",
+      "url": "./?tab=scan",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "生成二维码",
+      "short_name": "生成",
+      "url": "./?tab=generate",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QR Helper · SwiftUI Liquid Glass 风格 Demo</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0F1115; color:#E8EAED; font-family:-apple-system,BlinkMacSystemFont,'PingFang SC',sans-serif; padding:32px 24px 64px; }
+  .demo-head { max-width:1180px; margin:0 auto 28px; display:flex; align-items:flex-end; justify-content:space-between; flex-wrap:wrap; gap:16px; }
+  .demo-head h1 { font-size:26px; font-weight:700; letter-spacing:.3px; }
+  .demo-head h1 em { font-style:normal; background:linear-gradient(90deg,#7DD3FC,#34D399); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .demo-head p { color:#9AA3AD; font-size:13px; margin-top:6px; }
+  .demo-ctrl { display:flex; gap:8px; }
+  .demo-ctrl button { height:38px; padding:0 18px; border-radius:999px; border:1px solid #2A3038; background:#171B21; color:#C9D1D9; font-size:13px; cursor:pointer; transition:.15s; }
+  .demo-ctrl button:hover { border-color:#7DD3FC; color:#7DD3FC; }
+  .demo-ctrl a { display:inline-flex; align-items:center; height:38px; padding:0 18px; border-radius:999px; background:#7DD3FC; color:#06242B; font-size:13px; font-weight:600; text-decoration:none; }
+  .grid { max-width:1180px; margin:0 auto; display:flex; flex-wrap:wrap; gap:40px; justify-content:center; }
+  .frame-wrap { display:flex; flex-direction:column; align-items:center; gap:12px; }
+  .frame-wrap .cap { font-size:13px; color:#9AA3AD; font-weight:600; letter-spacing:.6px; }
+
+  .phone { width:340px; height:724px; border-radius:46px; border:9px solid #1A1D22; overflow:hidden; position:relative;
+           box-shadow:0 34px 70px rgba(0,0,0,.5); }
+  .phone.light {
+    --bg:#F2F2F7; --card:#FFFFFF; --text:#0B0B0F; --muted:#8A8A8E; --sep:rgba(60,60,67,.18);
+    --accent:#16A34A; --fill:#E9E9EB; --glass:rgba(255,255,255,.72); --glass-line:rgba(255,255,255,.55);
+    --danger:#FF3B30; --blue:#0A84FF;
+  }
+  .phone.dark {
+    --bg:#000000; --card:#1C1C1E; --text:#FFFFFF; --muted:#8E8E93; --sep:rgba(84,84,88,.5);
+    --accent:#30D158; --fill:#2C2C2E; --glass:rgba(28,28,30,.68); --glass-line:rgba(255,255,255,.12);
+    --danger:#FF453A; --blue:#0A84FF;
+  }
+  .phone { background:var(--bg); color:var(--text); }
+
+  .status { height:52px; display:flex; align-items:center; justify-content:space-between; padding:14px 26px 0; font-size:13px; font-weight:600; position:relative; z-index:5; }
+  .island { position:absolute; top:11px; left:50%; transform:translateX(-50%); width:92px; height:26px; background:#000; border-radius:16px; }
+  .status .sig { display:flex; gap:5px; align-items:center; }
+  .status .bar { width:3px; background:currentColor; border-radius:2px; }
+  .battery { width:22px; height:11px; border:1.4px solid currentColor; border-radius:3px; position:relative; opacity:.9; }
+  .battery::after { content:''; position:absolute; inset:1.5px; width:70%; background:currentColor; border-radius:1px; }
+
+  svg.ic { width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
+  svg.ic-sm { width:16px; height:16px; }
+  svg.ic-lg { width:24px; height:24px; }
+
+  /* Liquid Glass 顶栏 */
+  .lheader { position:relative; z-index:4; padding:2px 20px 12px; display:flex; align-items:center; justify-content:space-between; }
+  .lheader .title { font-size:24px; font-weight:700; letter-spacing:-.4px; }
+  .lglass { background:var(--glass); backdrop-filter:blur(24px) saturate(180%); -webkit-backdrop-filter:blur(24px) saturate(180%);
+            border:1px solid var(--glass-line); }
+  .round-btn { width:38px; height:38px; border-radius:50%; display:grid; place-items:center; color:var(--text); }
+
+  .content { padding:2px 0 92px; }
+
+  /* 相机卡 */
+  .cam { margin:2px 16px 0; border-radius:22px; overflow:hidden; position:relative; height:306px;
+         background:linear-gradient(160deg,#1B242C 0%,#0C1115 100%); }
+  .cam .chip-live { position:absolute; top:14px; left:14px; height:27px; padding:0 11px; border-radius:9px;
+    background:rgba(255,255,255,.16); backdrop-filter:blur(10px); color:#fff; font-size:11.5px; font-weight:600;
+    display:flex; align-items:center; gap:6px; }
+  .cam .chip-live i { width:7px; height:7px; border-radius:50%; background:#30D158; animation:pulse 1.6s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  .reticle { position:absolute; top:50%; left:50%; width:186px; height:186px; transform:translate(-50%,-58%); }
+  .reticle span { position:absolute; width:32px; height:32px; border:3.5px solid #30D158; border-radius:9px; box-shadow:0 0 14px rgba(48,209,88,.5); }
+  .reticle span:nth-child(1){ top:0; left:0; border-right:0; border-bottom:0; }
+  .reticle span:nth-child(2){ top:0; right:0; border-left:0; border-bottom:0; }
+  .reticle span:nth-child(3){ bottom:0; left:0; border-right:0; border-top:0; }
+  .reticle span:nth-child(4){ bottom:0; right:0; border-left:0; border-top:0; }
+  .scanline { position:absolute; left:12%; right:12%; height:3px; border-radius:3px; background:linear-gradient(90deg,transparent,#30D158,transparent);
+    box-shadow:0 0 18px 2px rgba(48,209,88,.55); animation:scan 2.2s ease-in-out infinite; }
+  @keyframes scan { 0%{top:14%} 50%{top:76%} 100%{top:14%} }
+  .cam-actions { position:absolute; left:0; right:0; bottom:14px; display:flex; justify-content:center; gap:10px; }
+
+  /* iOS 按钮 */
+  .btn { height:50px; padding:0 22px; border-radius:15px; border:0; font-size:16px; font-weight:600;
+         display:inline-flex; align-items:center; justify-content:center; gap:8px; }
+  .btn-fill { background:var(--accent); color:#fff; }
+  .btn-gray { background:var(--fill); color:var(--text); }
+  .btn-glass { color:#fff; border:1px solid rgba(255,255,255,.35); background:rgba(255,255,255,.18); backdrop-filter:blur(12px); }
+  .btn-plain { background:none; color:var(--accent); font-weight:500; height:44px; padding:0 12px; }
+  .btn-icon { width:50px; padding:0; }
+
+  /* 结果 Sheet */
+  .sheet { margin:12px 10px 0; background:var(--card); border-radius:20px; padding:10px 18px 18px; box-shadow:0 -6px 30px rgba(0,0,0,.12); }
+  .grabber { width:36px; height:5px; border-radius:3px; background:var(--muted); opacity:.4; margin:2px auto 12px; }
+  .badge { display:inline-flex; align-items:center; height:22px; padding:0 9px; border-radius:7px;
+           background:var(--accent); color:#fff; font-size:11px; font-weight:700; letter-spacing:.3px; }
+  .badge.alt { background:var(--fill); color:var(--muted); }
+  .result-text { font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:13.5px; line-height:1.55; margin:11px 0 13px; word-break:break-all; }
+  .row { display:flex; gap:8px; align-items:center; }
+  .row.wrap { flex-wrap:wrap; }
+  .sheet .hint { font-size:11.5px; color:var(--muted); margin-top:11px; display:flex; align-items:center; gap:5px; }
+
+  /* 生成页 */
+  .seg-ios { display:flex; background:var(--fill); border-radius:9px; padding:2px; margin:8px 16px 0; height:34px; }
+  .seg-ios div { flex:1; display:grid; place-items:center; border-radius:7px; font-size:13px; font-weight:600; color:var(--text); }
+  .seg-ios div.on { background:var(--card); box-shadow:0 1px 4px rgba(0,0,0,.14); }
+  .field { background:var(--card); border-radius:13px; margin:12px 16px 0; padding:13px 15px; }
+  .field label { font-size:11.5px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
+  .field .val { font-size:15px; margin-top:6px; line-height:1.5; }
+  .chip-row { display:flex; gap:8px; padding:6px 16px 0; overflow:hidden; }
+  .chip-ios { height:32px; padding:0 13px; border-radius:9px; background:var(--fill); color:var(--text);
+              font-size:13px; font-weight:500; display:inline-flex; align-items:center; white-space:nowrap; }
+  .chip-ios.on { background:var(--accent); color:#fff; }
+  .qr-card { margin:12px 16px 0; background:var(--card); border-radius:13px; padding:18px; display:flex; flex-direction:column; align-items:center; }
+  .qr-card canvas { width:164px; height:164px; border-radius:10px; }
+  .qr-card .cap { font-size:12px; color:var(--muted); margin-top:11px; }
+
+  /* 搜索框 */
+  .search-ios { margin:6px 16px 0; height:38px; border-radius:10px; background:var(--fill);
+                display:flex; align-items:center; gap:8px; padding:0 12px; color:var(--muted); font-size:15px; }
+
+  /* Inset Grouped 列表 */
+  .list { background:var(--card); border-radius:13px; margin:12px 16px 0; overflow:hidden; }
+  .l-row { display:flex; align-items:center; gap:12px; padding:0 15px; min-height:48px; }
+  .l-row + .l-row { border-top:1px solid var(--sep); position:relative; }
+  .l-row .gl { font-size:15px; flex:1; }
+  .l-row .gr { font-size:14px; color:var(--muted); display:flex; align-items:center; gap:7px; }
+  .chev { width:8px; height:8px; border-top:2px solid var(--muted); border-right:2px solid var(--muted); transform:rotate(45deg); opacity:.7; }
+  .avatar { width:29px; height:29px; border-radius:8px; display:grid; place-items:center; color:#fff; }
+  .list-note { font-size:11.5px; color:var(--muted); margin:6px 32px 0; }
+  .sec-h { font-size:13px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin:20px 32px 7px; font-weight:600; }
+
+  /* iOS 开关 */
+  .sw-ios { width:51px; height:31px; border-radius:999px; background:var(--fill); position:relative; }
+  .sw-ios.on { background:var(--accent); }
+  .sw-ios i { position:absolute; top:2px; left:2px; width:27px; height:27px; border-radius:50%; background:#fff;
+              transition:.2s; box-shadow:0 2px 5px rgba(0,0,0,.25); }
+  .sw-ios.on i { left:22px; }
+
+  .swatch-row { display:flex; gap:12px; padding:4px 15px 14px; }
+  .sw { width:30px; height:30px; border-radius:50%; }
+  .sw.on { outline:3px solid var(--accent); outline-offset:3px; }
+
+  /* Liquid Glass Tab Bar */
+  .tabbar { position:absolute; left:10px; right:10px; bottom:10px; height:72px; border-radius:26px; display:flex; z-index:6; }
+  .tabbar .item { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+                  color:var(--muted); font-size:10.5px; font-weight:600; }
+  .tabbar .item.on { color:var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="demo-head">
+  <div>
+    <h1>QR Helper · <em>SwiftUI Liquid Glass</em> 风格 Demo</h1>
+    <p>玻璃拟态浮动 Tab · Inset Grouped 列表 · iOS 组件（开关/分段/Sheet）· 大标题导航 — 内容布局同 PLAN §9，同一套令牌切浅/深色</p>
+  </div>
+  <div class="demo-ctrl">
+    <button onclick="setMode('light')">☀ 浅色</button>
+    <button onclick="setMode('dark')">☾ 深色</button>
+    <a href="material.html">Material 3 套系 →</a>
+  </div>
+</div>
+
+<div class="grid">
+
+  <!-- ========== 扫码页 ========== -->
+  <div class="frame-wrap">
+    <div class="cap">1 · 扫码页（默认）</div>
+    <div class="phone light">
+      <div class="status"><span>9:41</span><div class="island"></div>
+        <div class="sig"><div class="bar" style="height:5px"></div><div class="bar" style="height:8px"></div><div class="bar" style="height:11px"></div><div class="battery"></div></div>
+      </div>
+      <div class="lheader">
+        <div class="title">扫码</div>
+        <div class="round-btn lglass"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></div>
+      </div>
+      <div class="content">
+        <div class="cam">
+          <div class="chip-live"><i></i>实时识别</div>
+          <div class="reticle"><span></span><span></span><span></span><span></span></div>
+          <div class="scanline"></div>
+          <div class="cam-actions">
+            <button class="btn btn-fill" style="height:44px; border-radius:12px; font-size:15px"><svg class="ic ic-sm" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>开始相机</button>
+            <button class="btn btn-glass btn-icon" style="height:44px; width:44px; border-radius:12px"><svg class="ic ic-sm" viewBox="0 0 24 24"><path d="M13 2 3 14h8l-1 8 10-12h-8z"/></svg></button>
+            <button class="btn btn-glass" style="height:44px; border-radius:12px; font-size:15px"><svg class="ic ic-sm" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.8"/><path d="m21 15-5-5L5 21"/></svg>识别图片</button>
+          </div>
+        </div>
+        <div class="sheet">
+          <div class="grabber"></div>
+          <div class="row" style="justify-content:space-between">
+            <span class="badge">QRCODE</span>
+            <span class="badge alt">刚刚 · 已保存</span>
+          </div>
+          <div class="result-text">https://example.com/product/42</div>
+          <div class="row wrap">
+            <button class="btn btn-fill"><svg class="ic ic-sm" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6M10 14 21 3"/></svg>打开网址</button>
+            <button class="btn btn-gray"><svg class="ic ic-sm" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>复制</button>
+            <button class="btn btn-plain">生成条码</button>
+          </div>
+          <div class="hint"><svg class="ic ic-sm" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>识别成功 · 触感反馈 + 提示音</div>
+        </div>
+      </div>
+      <div class="tabbar lglass">
+        <div class="item on"><svg class="ic" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>扫码</div>
+        <div class="item"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h3v3h-3zM18 18h3v3h-3z"/></svg>生成</div>
+        <div class="item"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>历史</div>
+        <div class="item"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>设置</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 生成页 ========== -->
+  <div class="frame-wrap">
+    <div class="cap">2 · 生成页</div>
+    <div class="phone light">
+      <div class="status"><span>9:41</span><div class="island"></div>
+        <div class="sig"><div class="bar" style="height:5px"></div><div class="bar" style="height:8px"></div><div class="bar" style="height:11px"></div><div class="battery"></div></div>
+      </div>
+      <div class="lheader">
+        <div class="title">生成条码</div>
+        <div class="round-btn lglass"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></div>
+      </div>
+      <div class="content">
+        <div class="chip-row">
+          <div class="chip-ios on">文本</div><div class="chip-ios">网址</div><div class="chip-ios">WiFi</div><div class="chip-ios">vCard</div><div class="chip-ios">日历</div>
+        </div>
+        <div class="field">
+          <label>文本内容</label>
+          <div class="val">你好，世界！Hello QR Helper ✨</div>
+        </div>
+        <div class="sec-h" style="margin-bottom:0">纠错等级</div>
+        <div class="seg-ios"><div>L</div><div class="on">M</div><div>Q</div><div>H</div></div>
+        <div class="qr-card">
+          <canvas class="qr" width="328" height="328"></canvas>
+          <div class="cap">QR Code · 29×29 · 纠错 M · 实时预览</div>
+        </div>
+        <div class="row" style="padding:12px 16px 0">
+          <button class="btn btn-fill" style="flex:1"><svg class="ic ic-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>下载 PNG</button>
+          <button class="btn btn-gray" style="flex:1">SVG</button>
+          <button class="btn btn-gray btn-icon"><svg class="ic ic-sm" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+        </div>
+      </div>
+      <div class="tabbar lglass">
+        <div class="item"><svg class="ic" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>扫码</div>
+        <div class="item on"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h3v3h-3zM18 18h3v3h-3z"/></svg>生成</div>
+        <div class="item"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>历史</div>
+        <div class="item"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>设置</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 历史页 ========== -->
+  <div class="frame-wrap">
+    <div class="cap">3 · 历史页</div>
+    <div class="phone light">
+      <div class="status"><span>9:41</span><div class="island"></div>
+        <div class="sig"><div class="bar" style="height:5px"></div><div class="bar" style="height:8px"></div><div class="bar" style="height:11px"></div><div class="battery"></div></div>
+      </div>
+      <div class="lheader">
+        <div class="title">历史</div>
+        <div class="round-btn lglass"><svg class="ic" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg></div>
+      </div>
+      <div class="content">
+        <div class="search-ios"><svg class="ic ic-sm" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>搜索</div>
+        <div class="list">
+          <div class="l-row">
+            <div class="avatar" style="background:#16A34A"><svg class="ic ic-sm" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h3v3h-3zM18 18h3v3h-3z"/></svg></div>
+            <div class="gl" style="min-width:0">
+              <div style="font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">https://example.com/product/42</div>
+              <div style="font-size:12px; color:var(--muted); margin-top:2px">QRCODE · 刚刚 · 扫码</div>
+            </div>
+            <div class="chev"></div>
+          </div>
+          <div class="l-row">
+            <div class="avatar" style="background:#0A84FF"><svg class="ic ic-sm" viewBox="0 0 24 24"><path d="M4 5h2v14H4zM9 5h1v14H9zM13 5h3v14h-3zM19 5h1v14h-1z" stroke-width="1.2"/></svg></div>
+            <div class="gl" style="min-width:0">
+              <div style="font-size:15px">6901234567892</div>
+              <div style="font-size:12px; color:var(--muted); margin-top:2px">EAN13 · 昨天 21:04 · 扫码</div>
+            </div>
+            <div class="chev"></div>
+          </div>
+          <div class="l-row">
+            <div class="avatar" style="background:#7C3AED"><svg class="ic ic-sm" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 12h16M12 4v16" stroke-width="1.2"/></svg></div>
+            <div class="gl" style="min-width:0">
+              <div style="font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">LOT-2026-11-B7 / 批次检验</div>
+              <div style="font-size:12px; color:var(--muted); margin-top:2px">DATA MATRIX · 昨天 18:32 · 生成</div>
+            </div>
+            <div class="chev"></div>
+          </div>
+          <div class="l-row" style="opacity:.5">
+            <div class="avatar" style="background:#8E8E93"><svg class="ic ic-sm" viewBox="0 0 24 24"><path d="M5 12.6a10 10 0 0 1 14 0M8.5 16.1a5 5 0 0 1 7 0M2 9.1a15 15 0 0 1 20 0"/><circle cx="12" cy="19.5" r="1.2"/></svg></div>
+            <div class="gl" style="min-width:0">
+              <div style="font-size:15px">WIFI:T:WPA;S:HomeNet;P:••••••;;</div>
+              <div style="font-size:12px; color:var(--muted); margin-top:2px">WIFI · 11月17日 · 生成</div>
+            </div>
+            <div class="chev"></div>
+          </div>
+        </div>
+        <div class="list" style="margin-top:16px">
+          <div class="l-row"><div class="gl" style="color:var(--accent)">导出 CSV</div><div class="gr"><svg class="ic ic-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg></div></div>
+          <div class="l-row"><div class="gl" style="color:var(--danger)">清空历史</div><div class="gr"><svg class="ic ic-sm" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></div></div>
+        </div>
+        <div class="list-note">长按列表项进入多选，批量删除 · 上限 200 条 FIFO</div>
+      </div>
+      <div class="tabbar lglass">
+        <div class="item"><svg class="ic" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>扫码</div>
+        <div class="item"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h3v3h-3zM18 18h3v3h-3z"/></svg>生成</div>
+        <div class="item on"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>历史</div>
+        <div class="item"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>设置</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 设置页 ========== -->
+  <div class="frame-wrap">
+    <div class="cap">4 · 设置页</div>
+    <div class="phone light">
+      <div class="status"><span>9:41</span><div class="island"></div>
+        <div class="sig"><div class="bar" style="height:5px"></div><div class="bar" style="height:8px"></div><div class="bar" style="height:11px"></div><div class="battery"></div></div>
+      </div>
+      <div class="lheader">
+        <div class="title">设置</div>
+        <div class="round-btn lglass"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></div>
+      </div>
+      <div class="content">
+        <div class="sec-h">外观</div>
+        <div class="seg-ios"><div class="on">浅色</div><div>深色</div><div>跟随系统</div></div>
+        <div class="list">
+          <div class="l-row"><div class="gl">主题色</div><div class="gr">绿 · 默认<div class="chev"></div></div></div>
+        </div>
+        <div class="swatch-row" style="margin:0 16px">
+          <div class="sw on" style="background:#16A34A"></div><div class="sw" style="background:#0A84FF"></div>
+          <div class="sw" style="background:#7C3AED"></div><div class="sw" style="background:#FF2D55"></div>
+          <div class="sw" style="background:#FF9500"></div><div class="sw" style="background:#8E8E93"></div>
+        </div>
+        <div class="sec-h">扫码反馈</div>
+        <div class="list">
+          <div class="l-row"><div class="gl">提示音</div><div class="sw-ios on"><i></i></div></div>
+          <div class="l-row"><div class="gl">触感反馈</div><div class="sw-ios on"><i></i></div></div>
+        </div>
+        <div class="sec-h">数据</div>
+        <div class="list">
+          <div class="l-row"><div class="gl" style="color:var(--accent)">导出历史 CSV</div><div class="gr"><svg class="ic ic-sm" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg></div></div>
+          <div class="l-row"><div class="gl" style="color:var(--danger)">清空历史</div><div class="gr"><svg class="ic ic-sm" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></div></div>
+        </div>
+        <div class="sec-h">关于</div>
+        <div class="list">
+          <div class="l-row"><div class="gl">版本</div><div class="gr">v0.1.0</div></div>
+          <div class="l-row"><div class="gl">解码引擎</div><div class="gr">zxing-wasm 2.x</div></div>
+          <div class="l-row"><div class="gl">隐私</div><div class="gr"><span class="badge">零网络请求</span></div></div>
+          <div class="l-row"><div class="gl">许可证</div><div class="gr">MIT<div class="chev"></div></div></div>
+        </div>
+      </div>
+      <div class="tabbar lglass">
+        <div class="item"><svg class="ic" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>扫码</div>
+        <div class="item"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h3v3h-3zM18 18h3v3h-3z"/></svg>生成</div>
+        <div class="item"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>历史</div>
+        <div class="item on"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>设置</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function setMode(m){ document.querySelectorAll('.phone').forEach(p => p.className = 'phone ' + m); }
+  function drawQR(cv){
+    const ctx = cv.getContext('2d'), n = 29, m = 2, cell = cv.width / (n + m * 2);
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height); ctx.fillStyle = '#141A16';
+    let s = 20261119;
+    const rnd = () => ((s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+      const inF = (i < 9 && j < 9) || (i < 9 && j >= n - 9) || (i >= n - 9 && j < 9);
+      if (!inF && rnd() > 0.52) ctx.fillRect((j + m) * cell, (i + m) * cell, cell, cell);
+    }
+    const finder = (x, y) => {
+      for (let i = 0; i < 7; i++) for (let j = 0; j < 7; j++) {
+        const b = (i === 0 || i === 6 || j === 0 || j === 6) || (i >= 2 && i <= 4 && j >= 2 && j <= 4);
+        if (b) ctx.fillRect((x + j + m) * cell, (y + i + m) * cell, cell, cell);
+      }
+    };
+    finder(0, 0); finder(n - 7, 0); finder(0, n - 7);
+  }
+  document.querySelectorAll('canvas.qr').forEach(drawQR);
+</script>
+</body>
+</html>
