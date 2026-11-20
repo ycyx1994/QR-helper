@@ -121,7 +121,7 @@ HTTPS=1 npm run build && HTTPS=1 npx vite preview --host 0.0.0.0 --port 4173
 
 1. 推送到 GitHub 仓库 `main` 分支
 2. 仓库 Settings → Pages → Source 选择 **GitHub Actions**
-3. 推送后 `deploy.yml` 自动测试、构建（`PWA_BASE=/<repo>/`）、部署
+3. 推送后 `deploy.yml` 自动检查（svelte-check）、测试、构建（`PWA_BASE=/<repo>/`）、部署
 
 本地预览产物：
 
@@ -154,4 +154,4 @@ npm run build && npm run preview
 
 ## 📄 许可
 
-[MIT](LICENSE) © [ycyx1994](https://github.com/ycyx1994)
+[MIT](LICENSE) © 2026 [ycyx1994](https://github.com/ycyx1994)

@@ -31,8 +31,16 @@ export function detect(text: string): Detected {
   if (/^tel:/i.test(t)) return { category: 'tel', url: t, fields: { number: t.slice(4) } };
   if (/^mailto:/i.test(t)) {
     const m = t.slice(7);
-    const [addr, query] = m.split('?');
-    const q = new URLSearchParams(query ?? '');
+    // 只在第一个 '?' 切分，body 内可含 '?'；地址做百分号解码
+    const qi = m.indexOf('?');
+    const addrRaw = qi < 0 ? m : m.slice(0, qi);
+    let addr = addrRaw;
+    try {
+      addr = decodeURIComponent(addrRaw);
+    } catch {
+      /* 非法百分号编码保留原值 */
+    }
+    const q = new URLSearchParams(qi < 0 ? '' : m.slice(qi + 1));
     return {
       category: 'email',
       url: t,

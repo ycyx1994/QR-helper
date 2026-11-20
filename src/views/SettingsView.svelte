@@ -17,6 +17,23 @@
   } from '../lib/pwa';
 
   let confirmOpen = $state(false);
+  // 清空确认浮层 dialog 引用（打开后聚焦用）
+  let confirmDialog = $state<HTMLDivElement | undefined>();
+
+  // 清空确认浮层：打开时聚焦 dialog、Esc 关闭（window 级监听，焦点不在浮层内也能关）、关闭后焦点还给触发按钮
+  $effect(() => {
+    if (!confirmOpen) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    confirmDialog?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') confirmOpen = false;
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      opener?.focus();
+    };
+  });
 
   const accents: { id: AccentPreset; color: string }[] = [
     { id: 'green', color: '#2E6B3E' },
@@ -188,17 +205,16 @@
 </div>
 
 {#if confirmOpen}
+  <!-- Esc 已由 window 级监听统一处理（打开时焦点在 dialog 内） -->
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
   <div
     class="overlay"
     role="presentation"
     onclick={(e) => {
       if (e.target === e.currentTarget) confirmOpen = false;
     }}
-    onkeydown={(e) => {
-      if (e.key === 'Escape') confirmOpen = false;
-    }}
   >
-    <div class="dialog" role="alertdialog" aria-modal="true" tabindex="-1">
+    <div class="dialog" role="alertdialog" aria-modal="true" tabindex="-1" bind:this={confirmDialog}>
       <h3>{$_('hist.clear')}</h3>
       <p>{$_('hist.confirmClear', { values: { count: $history.length } })}</p>
       <div class="row">

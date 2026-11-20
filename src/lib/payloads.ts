@@ -36,8 +36,18 @@ function wifiEscape(v: string): string {
 }
 
 function dtLocal(v: string): string {
-  // "2026-01-01T09:00" → "20260101T090000"
-  return v.replace(/[-:]/g, '').padEnd(15, '0');
+  // 日期时间 "2026-01-01T09:00" → "20260101T090000"；纯日期 "2026-01-01" → "20260101"
+  const flat = v.replace(/[-:]/g, '');
+  return v.includes('T') ? flat.padEnd(15, '0') : flat.slice(0, 8);
+}
+
+/** vCard 3.0 / iCal 文本值转义：`\` `;` `,` 与换行 */
+function textEscape(v: string): string {
+  return v
+    .replace(/\\/g, '\\\\')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,')
+    .replace(/\r\n|\r|\n/g, '\\n');
 }
 
 export function buildPayload(type: PayloadType, f: PayloadFields): string {
@@ -58,11 +68,11 @@ export function buildPayload(type: PayloadType, f: PayloadFields): string {
     }
     case 'vcard': {
       const lines = ['BEGIN:VCARD', 'VERSION:3.0'];
-      if (f.name) lines.push(`FN:${f.name}`);
-      if (f.org) lines.push(`ORG:${f.org}`);
-      if (f.tel) lines.push(`TEL;TYPE=CELL:${f.tel}`);
-      if (f.email) lines.push(`EMAIL:${f.email}`);
-      if (f.vcardUrl) lines.push(`URL:${f.vcardUrl}`);
+      if (f.name) lines.push(`FN:${textEscape(f.name)}`);
+      if (f.org) lines.push(`ORG:${textEscape(f.org)}`);
+      if (f.tel) lines.push(`TEL;TYPE=CELL:${textEscape(f.tel)}`);
+      if (f.email) lines.push(`EMAIL:${textEscape(f.email)}`);
+      if (f.vcardUrl) lines.push(`URL:${textEscape(f.vcardUrl)}`);
       lines.push('END:VCARD');
       return lines.join('\n');
     }
@@ -82,13 +92,18 @@ export function buildPayload(type: PayloadType, f: PayloadFields): string {
   }
 }
 
+/** 日期时间属性：纯日期用 VALUE=DATE 形式，日期时间用本地浮动时间 */
+function dtProp(prop: 'DTSTART' | 'DTEND', v: string): string {
+  return v.includes('T') ? `${prop}:${dtLocal(v)}` : `${prop};VALUE=DATE:${dtLocal(v)}`;
+}
+
 function buildVevent(f: PayloadFields): string {
   const lines = ['BEGIN:VEVENT'];
-  if (f.summary) lines.push(`SUMMARY:${f.summary}`);
-  if (f.start) lines.push(`DTSTART:${dtLocal(f.start)}`);
-  if (f.end) lines.push(`DTEND:${dtLocal(f.end)}`);
-  if (f.location) lines.push(`LOCATION:${f.location}`);
-  if (f.desc) lines.push(`DESCRIPTION:${f.desc.replace(/\n/g, '\\n')}`);
+  if (f.summary) lines.push(`SUMMARY:${textEscape(f.summary)}`);
+  if (f.start) lines.push(dtProp('DTSTART', f.start));
+  if (f.end) lines.push(dtProp('DTEND', f.end));
+  if (f.location) lines.push(`LOCATION:${textEscape(f.location)}`);
+  if (f.desc) lines.push(`DESCRIPTION:${textEscape(f.desc)}`);
   lines.push('END:VEVENT');
   return lines.join('\n');
 }
@@ -117,8 +132,24 @@ export function autoCheckDigit(bcid: Symbology, text: string): string {
   const len = target[bcid];
   if (!len) return text;
   const digits = text.replace(/\D/g, '');
-  if (digits.length === len - 1) return digits + checkDigit(digits);
+  if (digits.length === len - 1) {
+    // UPC-E 校验位须按展开后的 11 位 UPC-A 计算，直接对 7 位加权会算错
+    const data = bcid === 'upce' ? upceToUpca11(digits) : digits;
+    return digits + checkDigit(data);
+  }
   return digits;
+}
+
+/**
+ * UPC-E（NS + 6 位 abcdef）展开为 11 位 UPC-A 数据位（不含校验位），
+ * GS1 零压缩逆规则（与 BWIPP upce 一致）：按尾位 f 分四段
+ */
+function upceToUpca11(d: string): string {
+  const f = d.charCodeAt(6) - 48;
+  if (f <= 2) return d.slice(0, 3) + d[6] + '0000' + d.slice(3, 6);
+  if (f === 3) return d.slice(0, 4) + '00000' + d.slice(4, 6);
+  if (f === 4) return d.slice(0, 5) + '00000' + d.slice(5, 6);
+  return d.slice(0, 6) + '0000' + d[6];
 }
 
 function checkDigit(digits: string): string {
@@ -170,11 +201,15 @@ export async function renderToSvg(opts: RenderOpts): Promise<string | null> {
   }
 }
 
-/** PNG Blob；内容非法时返回 null */
+/** PNG Blob；内容非法时返回 null。size 为目标边长，产物边长 ≈ size（±5%） */
 export async function renderToPngBlob(opts: RenderOpts, size = 1024): Promise<Blob | null> {
+  // 两遍渲染：第一遍 scale=1 探测模块尺寸，第二遍按目标边长定 scale
+  const probe = document.createElement('canvas');
+  const probed = await renderToCanvas(probe, { ...opts, scale: 1 });
+  if (!probed) return null;
+  const unit = Math.max(probe.width, probe.height, 1);
+  const scale = Math.max(2, Math.floor(size / unit));
   const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ok = await renderToCanvas(canvas, { ...opts, scale: Math.ceil(size / 64) });
+  const ok = await renderToCanvas(canvas, { ...opts, scale });
   return ok ? new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/png')) : null;
 }

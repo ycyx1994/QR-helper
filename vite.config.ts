@@ -18,7 +18,9 @@ export default defineConfig({
       registerType: 'prompt',
       // manifest 由 public/ 静态双语文件提供（zh-CN / en 运行时切换 link）
       manifest: false,
-      includeAssets: ['icons/*.png', 'favicon.svg', 'manifest.zh-CN.webmanifest', 'manifest.en.webmanifest'],
+      // public 静态资源（icons/favicon/双 manifest）已由 globPatterns 全量覆盖，
+      // 不再用 includeAssets 重复列出——避免 precache manifest 出现重复条目，
+      // 且 glob 键不带 ?query（与 index.html 的 favicon 引用保持一致）
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,wasm,webmanifest,ico}'],
         navigateFallback: 'index.html',

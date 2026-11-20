@@ -98,6 +98,9 @@ svg.ic-lg { width: 24px; height: 24px; }
 
 button { font-family: inherit; cursor: pointer; }
 input, textarea, select { font-family: inherit; color: inherit; }
+/* 链接与键盘焦点环统一走强调色（随 [data-accent] 切换） */
+a { color: var(--primary); }
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
 /* ===== 布局 ===== */
 .app { min-height: 100dvh; display: flex; flex-direction: column; }
@@ -374,10 +377,11 @@ input, textarea, select { font-family: inherit; color: inherit; }
   .hist .info .t2 { grid-column: 3; grid-row: 1; margin-top: 0; text-align: right; }
 }
 
-/* ---- 指针设备 hover 反馈 ---- */
+/* ---- 指针设备 hover 反馈（选中态优先：hover 不覆盖强调色选中背景） ---- */
 @media (hover: hover) {
-  .chip:hover { background: var(--surface-2); }
-  .seg button:hover { background: var(--surface-2); }
+  .chip:not(.on):hover { background: var(--surface-2); }
+  .seg button:not(.on):hover { background: var(--surface-2); }
+  .chip.on:hover, .seg button.on:hover { filter: brightness(.97); }
   .nav .item:hover { background: var(--surface); }
   .btn-fill:hover { filter: brightness(1.06); }
   .btn-tonal:hover { filter: brightness(.97); }

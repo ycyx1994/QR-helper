@@ -15,6 +15,39 @@
   let confirmOpen = $state(false);
   let qrItem = $state<HistoryItem | null>(null);
   let qrCanvas = $state<HTMLCanvasElement | undefined>();
+  // 浮层 dialog 元素引用（打开后聚焦用）
+  let confirmDialog = $state<HTMLDivElement | undefined>();
+  let qrDialog = $state<HTMLDivElement | undefined>();
+
+  // 清空确认浮层：打开时聚焦 dialog、Esc 关闭（window 级监听，焦点不在浮层内也能关）、关闭后焦点还给触发按钮
+  $effect(() => {
+    if (!confirmOpen) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    confirmDialog?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') confirmOpen = false;
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      opener?.focus();
+    };
+  });
+
+  // 二维码浮层：同上（打开聚焦 / Esc 关闭 / 焦点还给触发按钮）
+  $effect(() => {
+    if (!qrItem) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    qrDialog?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') qrItem = null;
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      opener?.focus();
+    };
+  });
 
   // 浮层打开时渲染该项二维码
   $effect(() => {
@@ -158,17 +191,16 @@
 {/if}
 
 {#if confirmOpen}
+  <!-- Esc 已由 window 级监听统一处理（打开时焦点在 dialog 内） -->
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
   <div
     class="overlay"
     role="presentation"
     onclick={(e) => {
       if (e.target === e.currentTarget) confirmOpen = false;
     }}
-    onkeydown={(e) => {
-      if (e.key === 'Escape') confirmOpen = false;
-    }}
   >
-    <div class="dialog" role="alertdialog" aria-modal="true" tabindex="-1">
+    <div class="dialog" role="alertdialog" aria-modal="true" tabindex="-1" bind:this={confirmDialog}>
       <h3>{$_('hist.clear')}</h3>
       <p>{$_('hist.confirmClear', { values: { count: $history.length } })}</p>
       <div class="row">
@@ -189,17 +221,16 @@
 {/if}
 
 {#if qrItem}
+  <!-- Esc 已由 window 级监听统一处理（打开时焦点在 dialog 内） -->
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
   <div
     class="overlay"
     role="presentation"
     onclick={(e) => {
       if (e.target === e.currentTarget) qrItem = null;
     }}
-    onkeydown={(e) => {
-      if (e.key === 'Escape') qrItem = null;
-    }}
   >
-    <div class="dialog qr-dialog" role="dialog" aria-modal="true" tabindex="-1">
+    <div class="dialog qr-dialog" role="dialog" aria-modal="true" tabindex="-1" bind:this={qrDialog}>
       <h3>{$_('hist.qrTitle')}</h3>
       <div class="qr-dialog-body">
         <canvas bind:this={qrCanvas} width="220" height="220"></canvas>

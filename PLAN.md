@@ -1,6 +1,6 @@
 # QR Helper — 全平台 PWA 二维码/条码工具 技术方案
 
-> 状态：待评审（v1）。本文档为实现前方案，未经确认不写实现代码。
+> 状态：已实现（v1，M1–M4 全部完成，见 §13 实现与验收记录）。本文档保留实现前方案框架，与现实的偏差已在文内「实现偏差」标注及 §13 汇总。
 > 约束已确认：**联网功能一律不做，保持纯本地**（用户确认，2026-11-19）。
 
 ---
@@ -19,7 +19,7 @@
 | Atharok 功能 | 本方案 | 说明 |
 |---|---|---|
 | 摄像头即时扫码 | ✅ 做 | `getUserMedia` + Worker 解码 |
-| 相册图片扫码（裁剪） | ✅ 做 | 文件 / 粘贴 / 拖拽 + 裁剪区 |
+| 相册图片扫码（裁剪） | ✅ 做 | 文件 / 粘贴 / 拖拽（裁剪区未实现） |
 | 全格式读取（QR/DM/PDF417/Aztec + EAN/UPC/Code39/93/128/Codabar/ITF） | ✅ 做 | zxing-wasm，格式表与 Atharok 完全一致 |
 | 条码生成（全格式、可调颜色/边距） | ✅ 做 | bwip-js |
 | 内容智能动作（vCard→联系人 / 日历 / 开网址 / WiFi） | ✅ 做 | .vcf / .ics 下载、tel/mailto/https、WiFi 配置码 |
@@ -41,20 +41,20 @@
 |---|---|---|
 | 解码引擎 | **zxing-wasm**（zxing-cpp 的 WASM 构建，Apache-2.0） | ① 格式覆盖与 Atharok 完全一致；② 与 Atharok 所用 ZXing 同源算法；③ Safari/iOS 的 `BarcodeDetector` 默认禁用（[caniuse](https://caniuse.com/mdn-api_barcodedetector)），WASM 是唯一全平台路径；④ zxing-js（纯 JS 版）已进维护模式不选 |
 | 生成引擎 | **bwip-js**（MIT） | 纯 JS，1D/2D 全格式生成，canvas/SVG 双输出，对齐 Atharok 生成能力 |
-| 技术栈 | **纯原生 JS，零构建** | 仓库即网站，GitHub Pages 直出，无 npm 构建链；"纯本地"诉求下无框架收益 |
+| 技术栈 | **Svelte 5 + TypeScript + Vite 8 + vite-plugin-pwa**（§10 选型，推翻初版"纯原生 JS 零构建"设想） | runes 响应式、编译产物无 runtime、Worker/WASM 一等公民；"纯本地"约束不变（构建链仅存在于开发期） |
 | 解码执行位置 | **Web Worker** | 解码不阻塞 UI；帧数据经 `transferable` 传递 |
 | 存储 | localStorage（≤200 条） | 历史数据量小；结构预留 IndexedDB 升级路径 |
 | 离线 | Service Worker 预缓存 + cache-first | 含 wasm 文件一次缓存永久离线 |
-| 部署 | GitHub Actions（actions/deploy-pages） | 推送 main 自动上线；README 附分支直出备选 |
+| 部署 | GitHub Actions（actions/deploy-pages） | 推送 main 自动 check+test+build+deploy 上线 |
 
 ### 2.1 体积预算（首屏加载）
 
 | 资源 | 体积 | 缓存后 |
 |---|---|---|
-| zxing_reader.wasm + 胶水 JS | ~1.1 MB | SW 缓存，离线 0 请求 |
-| bwip-js.min.js | ~250 KB | 同上 |
-| 应用代码 + 样式 + 图标 | ~60 KB | 同上 |
-| **合计** | **≈1.4 MB**（一次性） | 首屏 < 1s（4G），离线秒开 |
+| zxing_reader.wasm + Worker 解码器 | 947 KB + 36 KB | SW 预缓存，离线 0 请求 |
+| bwip-js 动态分包（生成页按需 async import） | 916 KB | 同上 |
+| 应用代码 + 样式（index + css） | 158 KB + 17 KB | 同上 |
+| **合计** | **≈2.1 MB**（一次性，SW 预缓存 14 项） | 首屏 < 1s（4G），离线秒开 |
 
 ---
 
@@ -62,24 +62,27 @@
 
 ```
 ┌────────────────────────────────────────────────────────┐
-│                    index.html (SPA)                     │
+│               index.html（Svelte 5 SPA）                │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────┐  │
 │  │ 扫码页    │  │ 生成页    │  │ 历史页   │  │ 设置页  │  │
+│  │ScanView  │  │Generate… │  │History…  │  │Settings│  │
 │  └────┬─────┘  └────┬─────┘  └────┬─────┘  └───┬────┘  │
 │       │             │             │             │       │
-│  ┌────▼─────┐  ┌────▼─────┐  ┌────▼─────┐              │
-│  │scanner.js│  │generator. │  │history.js│  app.js      │
-│  │摄像头管线 │  │js 生成管线│  │存储层     │  路由/主题    │
-│  └────┬─────┘  └────┬─────┘  └──────────┘              │
+│  ┌────▼─────┐  ┌────▼─────┐  ┌────▼─────┐  ┌───▼────┐  │
+│  │decoder/  │  │payloads. │  │history.ts│  │settings│  │
+│  │Worker 解码│  │ts 生成管线│  │存储层     │  │.ts 偏好│  │
+│  └────┬─────┘  └────┬─────┘  └──────────┘  └────────┘  │
 │  ┌────▼─────┐  ┌────▼─────┐  ┌──────────┐              │
-│  │decoder.js│  │actions.js│  │  sw.js    │              │
-│  │Worker封装│  │类型识别   │  │ 离线缓存  │              │
-│  └────┬─────┘  │+智能动作 │  └──────────┘              │
-└───────┼────────┴──────────┴─────────────────────────────┘
-   ┌────▼─────────────┐   ┌──────────────┐
-   │ worker-decode.js │   │ lib/bwip-js  │
-   │ zxing-wasm 解码   │   │ 全格式生成    │
-   └──────────────────┘   └──────────────┘
+│  │actions.ts│  │ pwa.ts   │  │ sw.js    │              │
+│  │类型识别  │  │安装/更新  │  │(构建生成) │              │
+│  │+智能动作 │  └──────────┘  │ 离线缓存  │              │
+│  └──────────┘               └──────────┘              │
+│        App.svelte（4 tab 轻路由/主题/i18n 全局壳）       │
+└────────────────────────────────────────────────────────┘
+   ┌────────────────────┐   ┌────────────────────┐
+   │ zxing-wasm（npm）   │   │ bwip-js（npm）      │
+   │ Worker 内 wasm 解码 │   │ 动态分包，全格式生成 │
+   └────────────────────┘   └────────────────────┘
    （全部运行于浏览器本地，零网络请求）
 ```
 
@@ -87,22 +90,28 @@
 
 ```
 QR-helper/
-├── index.html
-├── manifest.webmanifest        # PWA 清单（standalone、shortcuts、图标）
-├── sw.js                       # Service Worker：precache + cache-first
-├── css/style.css               # CSS 变量主题（浅/深/跟随系统）
-├── js/
-│   ├── app.js                  # 页面路由、全局状态、主题、SW 注册
-│   ├── scanner.js              # getUserMedia 管线：取帧节流、torch、启停
-│   ├── decoder.js              # Worker 池封装；图片降采样解码
-│   ├── worker-decode.js        # Worker 内 zxing-wasm 调用
-│   ├── generator.js            # bwip-js 封装；内容模板→码图；PNG/SVG 导出
-│   ├── actions.js              # 内容类型识别 + 智能动作按钮派发
-│   └── history.js              # localStorage CRUD、搜索、多选删除、CSV 导出
-├── lib/
-│   ├── zxing-wasm/             # zxing_reader.js + zxing_reader.wasm（本地化）
-│   └── bwip-js/bwip-js.min.js  # 本地化
-├── icons/                      # 192/512/maskable/180/favicon
+├── index.html                  # SPA 入口
+├── public/
+│   ├── favicon.svg
+│   ├── icons/                  # 192/512/maskable/apple-touch
+│   ├── manifest.zh-CN.webmanifest   # 双语 PWA 清单（按语言切换 link[rel=manifest]）
+│   └── manifest.en.webmanifest
+├── src/
+│   ├── main.ts                 # 入口：i18n/主题/SW/安装提示初始化
+│   ├── App.svelte              # 4 tab 轻路由（?tab=）、全局布局
+│   ├── app.css                 # Material 3 Expressive 设计令牌与组件
+│   ├── lib/
+│   │   ├── decoder/            # decoder.worker.ts + Decoder 封装（zxing-wasm）
+│   │   ├── payloads.ts         # 8 种 payload 构建 + bwip-js 渲染
+│   │   ├── actions.ts          # 扫码结果智能动作识别
+│   │   ├── history.ts          # localStorage 历史 + CSV 导出
+│   │   ├── settings.ts         # 主题 / 强调色 / 语言偏好
+│   │   ├── pwa.ts              # 安装提示 + 软件更新
+│   │   ├── i18n/ + locales/    # svelte-i18n 初始化 + zh-CN/en 语言包
+│   │   ├── ui/                 # Icon / Switch / toast 自研组件
+│   │   └── paste.ts / types.ts
+│   └── views/                  # ScanView / GenerateView / HistoryView / SettingsView
+├── vite.config.ts              # Vite + vite-plugin-pwa（precache）配置
 ├── tools/
 │   ├── generate_icons.py       # 图标再生成（Pillow）
 │   └── test-roundtrip.mjs      # 生成→解码往返测试（node）
@@ -111,41 +120,38 @@ QR-helper/
 
 ### 3.2 关键模块接口（实现契约）
 
-```js
-// decoder.js
-Decoder.init(): Promise<void>                       // 预热 wasm（启动时后台执行）
-Decoder.decode(imageData|ImageBitmap): Promise<{
-  text: string, format: string,           // format: 'qr_code'|'ean_13'|...
-  points?: Float32Array                   // 定位角，用于结果高亮框
-} | null>
+```ts
+// src/lib/decoder/index.ts（Worker 封装）
+decoder.warm(): Promise<void>                       // 预热 wasm（启动时后台执行）
+decoder.decode(imageData: ImageData): Promise<ScanResult[]>   // {text, format, points?}
+decoder.terminate(): void
 
-// scanner.js
-Scanner.start(videoEl): Promise<{hasTorch: boolean}>
-Scanner.stop(): void
-Scanner.toggleTorch(): Promise<boolean>
-Scanner.setInterval(ms): void                       // 解码节流（默认 66ms ≈15fps）
-Scanner.onResult(cb): void
+// src/views/ScanView.svelte（摄像头管线，组件内实现）
+// getUserMedia 取帧 + rAF 120ms 节流、torch、启停、同码 2.5s 冷却
 
-// generator.js
-Generator.buildPayload(type, fields): string        // 模板 → 码内容
-Generator.render(payload, {
-  symbology: 'qrcode'|'ean13'|... ,       // 默认 'qrcode'
-  ecLevel, scale, margin, fgColor, bgColor
-}): { svg: string, canvas: HTMLCanvasElement }
-Generator.downloadPNG(...)/downloadSVG(...)
+// src/lib/payloads.ts（生成管线）
+buildPayload(type: PayloadType, f: PayloadFields): string     // 模板 → 码内容
+autoCheckDigit(bcid: Symbology, text: string): string         // EAN/UPC 校验位自动补全
+renderToCanvas(canvas, opts: RenderOpts): Promise<boolean>   // 内容非法返回 false
+renderToSvg(opts: RenderOpts): Promise<string | null>
+renderToPngBlob(opts: RenderOpts, size = 1024): Promise<Blob | null>
 
-// actions.js
-Actions.detect(text): 'url'|'wifi'|'vcard'|'vevent'|'tel'|'mailto'|'sms'|'otpauth'|'geo'|'text'
-Actions.render(text): HTMLElement[]                 // 动作按钮组
+// src/lib/actions.ts
+detect(text: string): Detected                    // 类型识别（url/wifi/vcard/vevent/tel/…）
+parseWifi(text: string): Record<string, string>
 
-// history.js
-History.add(item): void
-History.list(query?): item[]                        // {id, ts, format, text, kind}
-History.remove(ids: string[]): void                 // 多选删除
-History.clear(): void
-History.exportCSV(): void
+// src/lib/history.ts（svelte store）
+history.add(text: string, format: ScanFormat, source: HistorySource): void
+history.remove(ids: string[]): void               // 多选删除
+exportCsv(items: HistoryItem[], filename?): void
+download(blob: Blob, filename: string): void
+
+// src/lib/pwa.ts
+initInstallPrompt(): void
+promptInstall(): Promise<'accepted'|'dismissed'|'unavailable'>
+initSwUpdate(): void / stopSwUpdateCheck(): void
+checkForUpdate(): Promise<boolean> / applyUpdate(): void
 ```
-
 ---
 
 ## 4. 功能规格
@@ -155,7 +161,7 @@ History.exportCSV(): void
 - **摄像头**：`facingMode: 'environment'` 优先后置；取景框 + 扫描线动画；解码节流 15fps；
   成功反馈：震动（`navigator.vibrate`，iOS 不支持则自动静默跳过）+ WebAudio 提示音（可关）。
 - **闪光灯**：`track.applyConstraints({advanced:[{torch:true}]})`，仅在 `getCapabilities().torch` 存在时显示。
-- **图片识别**：文件选择 / Ctrl+V 粘贴 / 拖拽；>1600px 自动降采样；支持裁剪区（对标 Atharok 裁剪扫描）。
+- **图片识别**：文件选择 / Ctrl+V 粘贴 / 拖拽；>1600px 自动降采样（裁剪区未实现）。
 - **结果卡**：格式徽章（QRCODE / EAN13 / …）、内容原文（等宽字体、可滚动）、智能动作按钮组、复制、"送入生成页"。
 - **同一内容 2.5s 冷却**，防止重复触发（对标连续扫码体验）。
 
@@ -176,11 +182,11 @@ History.exportCSV(): void
 
 ### 4.3 生成页
 
-- **码制**：QR Code（默认）、Data Matrix、PDF 417、Aztec、EAN-13、EAN-8、UPC-A、Code 128、Code 93、Code 39、Codabar、ITF（与 Atharok 生成范围一致）。
-- **内容模板**：文本 / 网址 / WiFi（T:S:P:H 标准串）/ vCard（下载 .vcf 预览）/ 日历 .ics / 电话 / 邮件 / 短信。
-- **样式**：纠错等级（QR: L/M/Q/H）、前景/背景色、尺寸、边距 margin（对标 Atharok 1.25.1 的 margin 特性）、圆角（QR）。
-- **导出**：PNG（canvas，10x 放大）/ SVG（矢量）；1D 条码含人读文本行。
-- **实时预览**：输入防抖 120ms；显示版本/模块数等元信息。
+- **码制**：QR Code（默认）、Data Matrix、PDF 417、Aztec、EAN-13、EAN-8、UPC-A、UPC-E、Code 128、Code 93、Code 39、Codabar、ITF（13 种，与 Atharok 生成范围一致）。
+- **内容模板**：文本 / 网址 / WiFi（T:S:P:H 标准串）/ vCard / 日历 .ics / 电话 / 邮件 / 短信。
+- **参数**：纠错等级（QR: L/M/Q/H）、EAN/UPC 校验位自动补全（颜色/尺寸/边距调参未实现，导出用固定样式）。
+- **导出**：PNG（1024px）/ SVG（矢量）；1D 条码含人读文本行。
+- **实时预览**：输入防抖 120ms 渲染（带 requestId 竞态守卫）；预览/下载/复制/存档统一用补全校验位后的最终文本（所见即所得）。
 
 ### 4.4 历史页
 
@@ -220,7 +226,7 @@ History.exportCSV(): void
 3. `.github/workflows/deploy.yml`（checkout → configure-pages → upload-pages-artifact → deploy-pages）自动上线；
 4. 地址：`https://<user>.github.io/QR-helper/`（全站相对路径，子路径/自定义域名均兼容）。
 
-**备选：分支直出**（Settings → Pages → Deploy from branch，`main`/root）——README 附说明。
+**备选：分支直出**（Settings → Pages → Deploy from branch，`main`/root）——未采用，仅留档。
 
 **部署后冒烟清单**：全部资源 200、`.wasm` MIME 正确、SW 注册成功、离线模式二次打开可用、三端（iOS Safari / Android Chrome / 桌面 Chrome+Firefox+Safari）扫码与生成通过。
 
@@ -274,7 +280,7 @@ History.exportCSV(): void
 全局框架：AppBar（Logo+标题+主题切换）+ 主内容 + 导航（手机=底部 Tab Bar 4 入口；≥768px=左侧边栏）。
 
 1. **扫码页**：取景卡片（4:3 视频 + reticle 遮罩 + 扫描线动画；开始相机/闪光灯/识别图片按钮，支持粘贴与拖拽）+ 结果卡（格式徽章 + 等宽内容区 + 智能动作组 + 复制/打开/送入生成；识别成功上滑出现）。
-2. **生成页**：码制 chips（QR/DM/PDF417/Aztec + 1D 系列）+ 按类型切换的内容模板表单 + 样式行（纠错/颜色/尺寸/边距）+ 实时预览（防抖 120ms）+ PNG/SVG/复制。手机上表单下预览；桌面左表单 420px + 右预览 sticky。
+2. **生成页**：码制 chips（QR/DM/PDF417/Aztec + 1D 系列）+ 按类型切换的内容模板表单 + 参数行（QR 纠错 L/M/Q/H；颜色/尺寸/边距未实现）+ 实时预览（防抖 120ms）+ PNG/SVG/复制。手机上表单下预览；桌面左表单 420px + 右预览 sticky。
 3. **历史页**：搜索框实时过滤 + 卡片列表（徽章/时间/来源/2 行截断）+ 多选删除（对标 Atharok）+ 导出 CSV + 清空（二次确认）+ 空状态引导。
 4. **设置页**：分组卡片——外观（浅/深/跟随系统 + 6 色主题板）、扫码反馈（声音/震动）、数据（CSV/清空）、关于（引擎版本、零网络声明、许可、对标致谢）。
 
@@ -307,7 +313,7 @@ GH Pages 只吃静态产物，所有 SSG/静态导出框架均可用，差别在
 **GH Pages 适配要点**（与框架无关，全部已验证）：
 1. 子路径 base：`base: '/REPO/'` 或 `'./'`，资源引用 `import.meta.env.BASE_URL`
 2. 路由回退：本项目 4 tab 轻路由（`?tab=` 或 hash），从根上避开 404 问题；History API 路由才需 404.html 重定向 trick
-3. SW：vite-plugin-pwa（Workbox），`globPatterns` 含 `wasm` 进 precache；默认 `navigateFallback: index.html` 恰好适用；`registerType: 'autoUpdate'`（参考 pp-karuta 的同形态部署）
+3. SW：vite-plugin-pwa（Workbox），`globPatterns` 含 `wasm` 进 precache；默认 `navigateFallback: index.html` 恰好适用；`registerType: 'prompt'`（发现新版本只提示，用户在设置页确认后更新）
 4. 流水线：actions/configure-pages → build → upload-pages-artifact(dist/) → deploy-pages
 5. GH Pages 不能设 header：不用 SharedArrayBuffer/多线程 wasm（zxing-wasm 单线程无需求）；.wasm MIME 部署冒烟断言 + instantiateStreaming 降级 instantiateArrayBuffer
 
@@ -347,7 +353,7 @@ GH Pages 只吃静态产物，所有 SSG/静态导出框架均可用，差别在
 
 **库选型**：svelte-i18n（选定；$t store + ICU 插值/复数，运行时 ~4KB gzip，字典打包离线）。备选 paraglide-js（编译期零运行时，但生态变动大，不选）；不手写轮子。
 
-**语言包结构**：`src/locales/zh-CN.ts` / `en.ts`，均 `as const` 导出；`type MessageKey = keyof typeof zhCN` 约束 en 键集——漏译键 = TS 编译错误。
+**语言包结构**：`src/lib/locales/zh-CN.ts` / `en.ts`，均 `as const` 导出；`type MessageKey = keyof typeof zhCN` 约束 en 键集——漏译键 = TS 编译错误。
 
 **行为**：
 1. 探测 `navigator.language`（zh* → zh-CN，否则 en），兜底 zh-CN；localStorage 持久化
@@ -370,12 +376,12 @@ GH Pages 只吃静态产物，所有 SSG/静态导出框架均可用，差别在
 | M1 扫码 | ScanView：getUserMedia + rAF 120ms 节流取帧 → Worker 解码；闪光灯、图片识别（拖拽/粘贴/选择）、震动+提示音反馈、同码 2.5s 冷却 | ✅ |
 | M2 生成 | GenerateView：8 payload × 13 码制、QR 纠错 L/M/Q/H、EAN/UPC 校验位自动补全、PNG/SVG 导出、复制 | ✅ |
 | M3 动作+历史 | actions.ts 智能动作（url/tel/mailto/sms/vcard→.vcf/event→.ics/wifi/geo/otpauth）；历史 200 条 FIFO、搜索、多选删除、CSV 导出（BOM+公式注入防护） | ✅ |
-| M4 PWA+部署 | vite-plugin-pwa 预缓存 21 项（含 wasm/worker/双 manifest）；deploy.yml（npm test → PWA_BASE=/<repo>/ build → deploy-pages）；zh-CN/en 双语 + manifest 本地化 | ✅ |
+| M4 PWA+部署 | vite-plugin-pwa 预缓存 14 项（含 wasm/worker/双 manifest，去重后）；deploy.yml（npm run check → npm test → PWA_BASE=/<repo>/ build → deploy-pages）；zh-CN/en 双语 + manifest 本地化 | ✅ |
 
 **验收证据**：
 - `npm test`：37/37 通过（payload 构建 ×12、校验位 ×3、bwip→zxing 往返 ×13 含中文 UTF-8/反色/WiFi 转义、detect 动作 ×11、parseWifi ×1）
 - `npm run check`（svelte-check）：0 errors / 0 warnings
-- 构建产物：index 145KB + css 11KB + bwip-js 916KB（生成页按需）+ zxing_reader.wasm 946KB + worker 36KB；SW 预缓存 21 项 ≈ 2.0MB
+- 构建产物：index 158KB + css 17KB + bwip-js 916KB（生成页按需，async import）+ zxing_reader.wasm 947KB + worker 36KB；SW 预缓存 14 项（无重复 URL）≈ 2.1MB
 - HTTP 冒烟：HTML/manifest/favicon/icons/worker 全 200；wasm `Content-type: application/wasm`（instantiateStreaming 可用）
 - `PWA_BASE=/QR-helper/` 构建验证：资源路径带仓库前缀，workbox precache 为相对 URL（scope 自适应子路径）
 
@@ -384,3 +390,4 @@ GH Pages 只吃静态产物，所有 SSG/静态导出框架均可用，差别在
 2. §11.1 SMUI → 未引入，自研组件移植 material.html（详见 §11.1 偏差说明）
 3. §12-4 manifest Blob 生成 → 静态双 manifest 文件 + link 切换（详见 §12-4）
 4. 已知平台行为：UPC-A 经 zxing 解码可能以 EAN-13 前补 0 形式返回（往返测试已按两种合法形式断言）
+5. 2026-11-20 code review 修复：生成页 EAN/UPC 口径统一为补全校验位后的最终文本（预览/下载/复制/存档一致）+ 渲染防抖 120ms 与竞态守卫；预填文本接口改为 `prefillText`/`prefillNonce`（消 prefill 幽灵复活）；pwa.ts 更新 interval 句柄化 + promptInstall 兜底；precache 去重（includeAssets 并入 globPatterns，21 → 14 项）；CI 增 `npm run check`；补 LICENSE（MIT）

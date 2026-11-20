@@ -19,7 +19,9 @@
   }
 
   let tab: Tab = $state(tabFromUrl());
-  let genText = $state('');
+  // 生成页预填：文本 + 递增 nonce（消费方仅在 nonce 变化时覆盖编辑内容，避免清空后"复活"）
+  let prefillText = $state('');
+  let prefillNonce = $state(0);
   let installDismissed = $state(localStorage.getItem('qrhelper.installDismissed') === '1');
 
   const showInstallBanner = $derived(
@@ -43,13 +45,30 @@
   }
 
   function navigate(t: Tab, prefill?: string) {
+    const sameTab = t === tab;
     tab = t;
-    if (prefill !== undefined) genText = prefill;
+    if (prefill !== undefined) {
+      // 带文本跳转：更新预填并递增 nonce，GenerateView 仅在 nonce 变化时覆盖编辑内容
+      prefillText = prefill;
+      prefillNonce += 1;
+    } else {
+      // 普通跳转：清空预填，防止旧文本在组件重新挂载时"复活"
+      prefillText = '';
+    }
     const url = new URL(location.href);
     url.searchParams.set('tab', t);
-    history.replaceState(null, '', url);
+    // 同 tab 重复进入用 replaceState 防重复条目；切 tab 用 pushState 建历史条目（后退可回到上一 tab）
+    if (sameTab) history.replaceState(null, '', url);
+    else history.pushState(null, '', url);
     window.scrollTo({ top: 0 });
   }
+
+  // 初始进入：replaceState 建立基线 URL（补 ?tab=），之后 pushState 的条目才有可回退起点
+  $effect(() => {
+    const url = new URL(location.href);
+    url.searchParams.set('tab', tabFromUrl());
+    history.replaceState(null, '', url);
+  });
 
   $effect(() => {
     const onPop = () => (tab = tabFromUrl());
@@ -72,14 +91,23 @@
     return () => window.removeEventListener('paste', onPaste);
   });
 
-  function toggleTheme() {
-    settings.update((s) => {
-      const darkNow = document.documentElement.classList.contains('dark');
-      return { ...s, theme: darkNow ? 'light' : 'dark' };
-    });
-  }
+  // 系统深色偏好：matchMedia 变化时更新（theme === 'system' 时参与明暗判定）
+  let systemDark = $state(window.matchMedia('(prefers-color-scheme: dark)').matches);
 
-  const dark = $derived(document.documentElement.classList.contains('dark'));
+  $effect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = (e: MediaQueryListEvent) => (systemDark = e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  });
+
+  // 生效中的深浅主题：从 settings 真实数据源派生（DOM 的 dark class 只是 applyTheme 的副作用），主题切换后图标随动
+  const dark = $derived($settings.theme === 'dark' || ($settings.theme === 'system' && systemDark));
+
+  function toggleTheme() {
+    // 以生效中的明暗为准翻转（当前 dark → light，否则 dark），不再读 DOM class
+    settings.update((s) => ({ ...s, theme: dark ? 'light' : 'dark' }));
+  }
 
   const tabDefs = [
     { id: 'scan', icon: 'camera', labelKey: 'tab.scan' },
@@ -100,7 +128,11 @@
       <div class="logo"><Icon name="qr" /></div>
       {$_('app.title')}
     </div>
-    <button class="icon-btn" onclick={toggleTheme} aria-label={$_('set.theme')}>
+    <button
+      class="icon-btn"
+      onclick={toggleTheme}
+      aria-label={`${$_('set.theme')} · ${dark ? $_('set.theme.dark') : $_('set.theme.light')}`}
+    >
       <Icon name={dark ? 'sun' : 'moon'} />
     </button>
   </header>
@@ -125,7 +157,7 @@
     {#if tab === 'scan'}
       <ScanView ongenerate={(text) => navigate('generate', text)} />
     {:else if tab === 'generate'}
-      <GenerateView initialText={genText} />
+      <GenerateView {prefillText} {prefillNonce} />
     {:else if tab === 'history'}
       <HistoryView ongenerate={(text) => navigate('generate', text)} />
     {:else}
@@ -142,7 +174,10 @@
     {/each}
   </nav>
 
-  {#if $toast}
-    <div class="toast">{$toast}</div>
-  {/if}
+  <!-- 常驻 aria-live 区域：toast 文本变化会被读屏播报 -->
+  <div class="toast-region" role="status" aria-live="polite">
+    {#if $toast}
+      <div class="toast">{$toast}</div>
+    {/if}
+  </div>
 </div>

@@ -44,11 +44,21 @@ check('tel', buildPayload('tel', { number: '10086' }), 'tel:10086');
 check('email', buildPayload('email', { to: 'a@b.c', subject: 'hi' }), 'mailto:a@b.c?subject=hi');
 check('sms', buildPayload('sms', { number: '10086', msg: 'ye' }), 'SMSTO:10086:ye');
 check('wrapIcs', wrapIcs('BEGIN:VEVENT\nEND:VEVENT').includes('VCALENDAR'), true);
+check('vcard 转义', buildPayload('vcard', { name: '张;三,李\\四', org: 'A;B', tel: '123', email: 'a@b.c' }),
+  'BEGIN:VCARD\nVERSION:3.0\nFN:张\\;三\\,李\\\\四\nORG:A\\;B\nTEL;TYPE=CELL:123\nEMAIL:a@b.c\nEND:VCARD');
+check('event 转义', buildPayload('event', { summary: 'a;b,c', location: 'x\\y', desc: 'l1\nl2' }),
+  'BEGIN:VEVENT\nSUMMARY:a\\;b\\,c\nLOCATION:x\\\\y\nDESCRIPTION:l1\\nl2\nEND:VEVENT');
+check('event 纯日期', buildPayload('event', { summary: 'x', start: '2026-01-01' }),
+  'BEGIN:VEVENT\nSUMMARY:x\nDTSTART;VALUE=DATE:20260101\nEND:VEVENT');
 
 // ---- 校验位 ----
 check('ean13 补校验位', autoCheckDigit('ean13', '590123412345').length, 13);
 check('ean13 已满不动', autoCheckDigit('ean13', '5901234123457'), '5901234123457');
 check('qrcode 不处理', autoCheckDigit('qrcode', 'abc'), 'abc');
+check('ean13 校验位值', autoCheckDigit('ean13', '590123412345'), '5901234123457');
+check('ean8 校验位值', autoCheckDigit('ean8', '9638507'), '96385074');
+check('upca 校验位值', autoCheckDigit('upca', '03600029145'), '036000291452');
+check('upce 已满不动', autoCheckDigit('upce', '01234505'), '01234505');
 
 // ---- 往返（bwip 渲染 → zxing 解码） ----
 await roundTrip('QR 中文 UTF-8', 'qrcode', '你好，QR Helper！测试 🎉');
@@ -71,6 +81,33 @@ await roundTrip('Aztec', 'azteccode', 'AZTEC payload');
   check('QR 反色', results.map((r) => r.text), ['inverted']);
 }
 
+// ---- UPC-E 校验位 20 组（bwip 7 位自算 vs autoCheckDigit 8 位） ----
+for (const ns of ['0', '1']) {
+  for (let f = 0; f <= 9; f++) {
+    const t = ns + '12345' + f;
+    const name = `upce 校验位 ns=${ns} f=${f}`;
+    const mine = autoCheckDigit('upce', t);
+    let expect;
+    try {
+      const png = await bwip.toBuffer({ bcid: 'upce', text: t, scale: 3, padding: 2, includetext: false, barcolor: '141A16', backgroundcolor: 'FFFFFF' });
+      const rs = await readBarcodes(new Uint8Array(png), { maxNumberOfSymbols: 1, tryHarder: true });
+      // zxing 返回 8 位 UPC-E 或展开的 12/13 位形式，末位即 bwip 自算的校验位
+      expect = rs.length ? t + rs[0].text.slice(-1) : `(解码失败 ${JSON.stringify(rs)})`;
+    } catch (e) {
+      expect = `(渲染异常 ${e.message})`;
+    }
+    check(name, mine, expect);
+    // 回灌 8 位（含校验位）给 bwip 二次校验：校验位错会抛 badCheckDigit
+    let reflowOk = true;
+    try {
+      await bwip.toBuffer({ bcid: 'upce', text: mine, scale: 3, padding: 2, includetext: false, barcolor: '141A16', backgroundcolor: 'FFFFFF' });
+    } catch {
+      reflowOk = false;
+    }
+    check(`${name} 回灌`, reflowOk, true);
+  }
+}
+
 // ---- 动作识别 ----
 check('detect url', detect('https://example.com/a?b=1').category, 'url');
 check('detect www', detect('www.example.com').category, 'url');
@@ -84,6 +121,47 @@ check('detect geo', detect('geo:39.9,116.4').category, 'geo');
 check('detect otpauth', detect('otpauth://totp/x?secret=1').category, 'otpauth');
 check('detect text', detect('随便一段文本').category, 'text');
 check('parseWifi', parseWifi('WIFI:T:WPA;S:My\\;Net;P:p\\:w;;'), { enc: 'WPA', ssid: 'My;Net', pass: 'p:w' });
+check('mailto body 含 ?', detect('mailto:a@b.c?subject=hi&body=what?ever').fields.body, 'what?ever');
+check('mailto 地址解码', detect('mailto:a%40b.c?subject=s%20t').fields, { to: 'a@b.c', subject: 's t', body: '' });
+
+// ---- 反序列化校验（localStorage 桩 + 动态导入 history/settings） ----
+const backing = new Map([
+  ['qrhelper.history', JSON.stringify([
+    { id: 'ok1', ts: 1700000000000, format: 'QRCode', text: 'hello', source: 'scan' },
+    { text: 42 },                                                    // text 非字符串 → 丢弃
+    { id: 'b1', ts: 'bad', format: 'QRCode', text: 'bad-ts', source: 'scan' }, // ts 非法 → 丢弃
+    { id: 'b2', ts: Infinity, format: 'QRCode', text: 'inf-ts', source: 'scan' }, // ts 非有限 → 丢弃
+    { id: 'f1', ts: 1, format: 'Bogus', text: 'bad-fmt', source: 'scan' },   // format 回落 Unknown
+    { id: 'f2', ts: 2, format: 'QRCode', text: 'bad-src', source: 'hack' },  // source 回落 scan
+    { id: '', ts: 3, format: 'QRCode', text: 'gen-id', source: 'scan' },     // id 回落生成
+    { id: 'e1', ts: 4, format: 'QRCode', text: '', source: 'scan' }          // 空文本 → 丢弃
+  ])],
+  ['qrhelper.settings', JSON.stringify({ theme: 999, accent: 'xxx', sound: 1, vibrate: 'yes', autoCamera: 0, lang: 'klingon', is2d: 5 })],
+  ['qrhelper.settings.v', '2']
+]);
+globalThis.localStorage = {
+  getItem: (k) => (backing.has(k) ? backing.get(k) : null),
+  setItem: (k, v) => backing.set(k, String(v)),
+  removeItem: (k) => backing.delete(k)
+};
+const { csvEsc, history } = await import('../src/lib/history.ts');
+const { settings } = await import('../src/lib/settings.ts');
+const { get } = await import('svelte/store');
+
+check('history 白名单校验', get(history).map((x) => [x.text, x.ts, x.format, x.source]), [
+  ['hello', 1700000000000, 'QRCode', 'scan'],
+  ['bad-fmt', 1, 'Unknown', 'scan'],
+  ['bad-src', 2, 'QRCode', 'scan'],
+  ['gen-id', 3, 'QRCode', 'scan']
+]);
+check('history id 回落生成', get(history).every((x) => typeof x.id === 'string' && x.id.length > 0), true);
+check('settings 白名单校验', get(settings), { theme: 'system', accent: 'slate', sound: true, vibrate: true, autoCamera: true, lang: 'auto' });
+
+// ---- CSV 公式注入转义 ----
+check('csv esc @ 前缀', csvEsc('@SUM(A1)'), '"\'@SUM(A1)"');
+check('csv esc = 前缀', csvEsc('=1+1'), '"\'=1+1"');
+check('csv esc 空白前缀', csvEsc('\tcmd'), '"\'\tcmd"');
+check('csv esc 普通值', csvEsc('ok, "q"'), '"ok, ""q"""');
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

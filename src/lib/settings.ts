@@ -28,12 +28,31 @@ const KEY = 'qrhelper.settings';
 const VER_KEY = 'qrhelper.settings.v';
 const VER = 2;
 
+/** 反序列化白名单：逐字段校验，非法字段回落默认值 */
+function sanitize(raw: unknown): Settings {
+  const s: Settings = { ...DEFAULTS };
+  if (typeof raw !== 'object' || raw === null) return s;
+  const o = raw as Record<string, unknown>;
+  if (o.theme === 'light' || o.theme === 'dark' || o.theme === 'system') s.theme = o.theme;
+  if (
+    o.accent === 'green' || o.accent === 'blue' || o.accent === 'violet' ||
+    o.accent === 'pink' || o.accent === 'orange' || o.accent === 'slate'
+  ) {
+    s.accent = o.accent;
+  }
+  if (typeof o.sound === 'boolean') s.sound = o.sound;
+  if (typeof o.vibrate === 'boolean') s.vibrate = o.vibrate;
+  if (typeof o.autoCamera === 'boolean') s.autoCamera = o.autoCamera;
+  if (o.lang === 'auto' || o.lang === 'zh-CN' || o.lang === 'en') s.lang = o.lang;
+  return s;
+}
+
 function load(): Settings {
   let s: Settings = { ...DEFAULTS };
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) {
-      s = { ...DEFAULTS, ...JSON.parse(raw) };
+      s = sanitize(JSON.parse(raw));
       // v2 迁移：旧默认色 green 会被自动持久化，统一迁到新默认 slate；
       // 用户显式选过的其他颜色保留。VER_KEY 防止日后显式选 green 被再次迁移。
       if (localStorage.getItem(VER_KEY) !== String(VER) && s.accent === 'green') {

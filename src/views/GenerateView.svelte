@@ -8,7 +8,8 @@
   import { showToast } from '../lib/ui/toast';
   import type { PayloadType, Symbology, ScanFormat } from '../lib/types';
 
-  let { initialText = '' }: { initialText?: string } = $props();
+  // prefillText/prefillNonce：扫码页带文本跳转时由 App 传入；nonce 为递增计数
+  let { prefillText = '', prefillNonce = 0 }: { prefillText?: string; prefillNonce?: number } = $props();
 
   const payloadTypes: { id: PayloadType; icon: string }[] = [
     { id: 'text', icon: 'text' },
@@ -41,30 +42,53 @@
   let symbology: Symbology = $state('qrcode');
   let ecLevel: 'L' | 'M' | 'Q' | 'H' = $state('M');
   // 挂载时捕获一次预填文本（扫码页跳转带入），后续不随 prop 变化覆盖用户编辑
-  let fields: PayloadFields = $state({ text: untrack(() => initialText) });
+  let fields: PayloadFields = $state({ text: untrack(() => prefillText) });
   let canvasEl: HTMLCanvasElement | undefined = $state();
   let valid = $state(true);
 
-  const is2d = $derived(['qrcode', 'datamatrix', 'pdf417', 'azteccode'].includes(symbology));
   const payloadText = $derived(buildPayload(type, fields));
+  // 统一口径：预览、下载、复制、存档全部用补全校验位后的最终文本（所见即所得）
+  const finalText = $derived(autoCheckDigit(symbology, payloadText));
 
+  // prefillNonce 变化（扫码页跳转）才套用预填文本；nonce 初值 0 不覆盖用户输入
   $effect(() => {
-    if (initialText && !fields.text) fields.text = initialText;
+    const nonce = prefillNonce;
+    if (nonce === 0) return;
+    const text = untrack(() => prefillText);
+    untrack(() => {
+      fields.text = text;
+    });
   });
 
+  // 渲染：防抖 120ms + 递增序号竞态守卫（慢请求返回时不覆盖新结果）
+  let renderSeq = 0;
+
   $effect(() => {
-    const text = payloadText;
+    const text = finalText;
     const bcid = symbology;
     const ec = ecLevel;
     const cv = canvasEl;
     if (!cv) return;
-    if (!text.trim()) {
-      const ctx = cv.getContext('2d');
-      ctx?.clearRect(0, 0, cv.width, cv.height);
-      valid = true;
-      return;
-    }
-    renderToCanvas(cv, { bcid, text, eclevel: ec, scale: 4, padding: 2 }).then((ok) => (valid = ok));
+    const seq = ++renderSeq;
+    const timer = setTimeout(() => {
+      if (!text.trim()) {
+        cv.getContext('2d')?.clearRect(0, 0, cv.width, cv.height);
+        if (seq === renderSeq) valid = true;
+        return;
+      }
+      // 渲染到离屏 canvas，resolve 时序号仍是最新才上屏（canvas 结果同样受竞态守卫）
+      const off = document.createElement('canvas');
+      renderToCanvas(off, { bcid, text, eclevel: ec, scale: 4, padding: 2 }).then((ok) => {
+        if (seq !== renderSeq) return; // 过期请求丢弃
+        if (ok) {
+          cv.width = off.width;
+          cv.height = off.height;
+          cv.getContext('2d')?.drawImage(off, 0, 0);
+        }
+        valid = ok;
+      });
+    }, 120);
+    return () => clearTimeout(timer); // 重新渲染或组件销毁时清定时器
   });
 
   function setType(t: PayloadType) {
@@ -92,12 +116,12 @@
   }
 
   function saveHistory() {
-    if (!payloadText.trim()) return;
-    history.add(autoCheckDigit(symbology, payloadText), fmtOf(symbology), 'generate');
+    if (!finalText.trim()) return;
+    history.add(finalText, fmtOf(symbology), 'generate');
   }
 
   async function downloadPng() {
-    const blob = await renderToPngBlob({ bcid: symbology, text: payloadText, eclevel: ecLevel });
+    const blob = await renderToPngBlob({ bcid: symbology, text: finalText, eclevel: ecLevel });
     if (!blob) return;
     saveHistory();
     download(blob, `qr-helper-${symbology}.png`);
@@ -105,7 +129,7 @@
   }
 
   async function downloadSvg() {
-    const svg = await renderToSvg({ bcid: symbology, text: payloadText, eclevel: ecLevel, scale: 4 });
+    const svg = await renderToSvg({ bcid: symbology, text: finalText, eclevel: ecLevel, scale: 4 });
     if (!svg) return;
     saveHistory();
     download(new Blob([svg], { type: 'image/svg+xml' }), `qr-helper-${symbology}.svg`);
@@ -113,9 +137,9 @@
   }
 
   function copyText() {
-    if (!payloadText.trim()) return;
+    if (!finalText.trim()) return;
     saveHistory();
-    navigator.clipboard?.writeText(payloadText).then(() => showToast($_('toast.copied')));
+    navigator.clipboard?.writeText(finalText).then(() => showToast($_('toast.copied')));
   }
 </script>
 
@@ -252,7 +276,7 @@
 
 <div class="tc-right tc-sticky">
 
-{#if payloadText.trim()}
+{#if finalText.trim()}
   <div class="qr-card">
     <canvas bind:this={canvasEl} width="336" height="336"></canvas>
     <div class="cap">
@@ -264,14 +288,14 @@
 {/if}
 
 <div class="row" style="padding:14px 16px 0">
-  <button class="btn btn-fill" style="flex:1" disabled={!valid || !payloadText.trim()} onclick={downloadPng}>
+  <button class="btn btn-fill" style="flex:1" disabled={!valid || !finalText.trim()} onclick={downloadPng}>
     <Icon name="download" cls="ic-sm" />
     {$_('gen.downloadPng')}
   </button>
-  <button class="btn btn-tonal" style="flex:1" disabled={!valid || !payloadText.trim()} onclick={downloadSvg}>
+  <button class="btn btn-tonal" style="flex:1" disabled={!valid || !finalText.trim()} onclick={downloadSvg}>
     {$_('gen.downloadSvg')}
   </button>
-  <button class="btn btn-tonal btn-icon" disabled={!payloadText.trim()} onclick={copyText} aria-label={$_('gen.copyText')}>
+  <button class="btn btn-tonal btn-icon" disabled={!finalText.trim()} onclick={copyText} aria-label={$_('gen.copyText')}>
     <Icon name="copy" cls="ic-sm" />
   </button>
 </div>

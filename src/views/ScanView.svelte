@@ -33,6 +33,11 @@
   let lastText = '';
   let lastAt = 0;
   let audioCtx: AudioContext | null = null;
+  let fileInput: HTMLInputElement | undefined = $state();
+  // 组件存活标志：onDestroy 置 false，防止 await 期间销毁后仍持有相机流
+  let alive = true;
+  // 页面隐藏前是否处于扫描态（恢复可见时自动重开）
+  let wasScanning = false;
 
   const detected = $derived(result ? detect(result.text) : null);
 
@@ -43,6 +48,8 @@
 
   // 打开页面时：相机权限已授权 → 自动开扫（未授权保持手动，避免突然弹出授权框）
   onMount(() => {
+    // 页面隐藏时释放相机，恢复可见时按需重开
+    document.addEventListener('visibilitychange', onVisibility);
     // 消费全局粘贴的图片（App 捕获后经 pendingImage 传递）
     const pasted = get(pendingImage);
     if (pasted) {
@@ -73,19 +80,31 @@
         return;
       }
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
+        const s = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } },
           audio: false
         });
-        if (!videoEl) return;
+        // await 期间组件被销毁 / 页面隐藏：立即释放相机，绝不长期持有
+        if (!alive || document.hidden) {
+          s.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        stream = s;
+        if (!videoEl) {
+          stop();
+          return;
+        }
         videoEl.srcObject = stream;
         await videoEl.play();
+        // play 期间组件被销毁：onDestroy(stop) 已释放，直接返回
+        if (!alive) return;
         scanning = true;
         const track = stream.getVideoTracks()[0];
         const caps = (track.getCapabilities?.() ?? {}) as MediaTrackCapabilities & { torch?: boolean };
         torchCap = !!caps.torch;
         rafId = requestAnimationFrame(tick);
       } catch (e) {
+        if (!alive) return;
         const name = (e as DOMException)?.name ?? '';
         camErrKind = name === 'NotAllowedError' || name === 'SecurityError' ? 'denied' : 'missing';
         camError = true;
@@ -103,6 +122,17 @@
     stream = null;
     torchOn = false;
     if (videoEl) videoEl.srcObject = null;
+  }
+
+  // 页面隐藏：停止扫描并释放相机省电；恢复可见时若原本在扫描则自动重开
+  function onVisibility() {
+    if (document.hidden) {
+      wasScanning = scanning || starting;
+      if (scanning) stop();
+    } else if (wasScanning) {
+      wasScanning = false;
+      void start();
+    }
   }
 
   async function toggleTorch() {
@@ -165,7 +195,10 @@
     if (s.vibrate) navigator.vibrate?.(80);
     if (s.sound) {
       try {
+        // 尽量复用单例 AudioContext
         audioCtx ??= new AudioContext();
+        // autoplay 策略下可能 suspended，使用前恢复
+        if (audioCtx.state === 'suspended') void audioCtx.resume();
         const o = audioCtx.createOscillator();
         const g = audioCtx.createGain();
         o.frequency.value = 880;
@@ -236,7 +269,14 @@
     showToast($_('toast.saved'));
   }
 
-  onDestroy(stop);
+  onDestroy(() => {
+    alive = false;
+    stop();
+    document.removeEventListener('visibilitychange', onVisibility);
+    // 关闭提示音 AudioContext，释放音频资源
+    void audioCtx?.close().catch(() => {});
+    audioCtx = null;
+  });
 </script>
 
 <svelte:window onpaste={onPaste} />
@@ -288,11 +328,11 @@
         {result ? $_('scan.resume') : $_('scan.start')}
       </button>
     {/if}
-    <label class="btn btn-ghost glass">
+    <button class="btn btn-ghost glass" onclick={() => fileInput?.click()}>
       <Icon name="image" cls="ic-sm" />
       {$_('scan.image')}
-      <input type="file" accept="image/*" hidden onchange={onPick} />
-    </label>
+    </button>
+    <input type="file" accept="image/*" hidden bind:this={fileInput} onchange={onPick} />
   </div>
 </div>
 
@@ -302,7 +342,7 @@
 {#if result && detected}
   <div class="card">
     <div class="row" style="justify-content:space-between">
-      <span class="badge">{result.format.toUpperCase()}</span>
+      <span class="badge">{result.format === 'Unknown' ? '—' : result.format.toUpperCase()}</span>
       <span class="badge alt">{saved ? $_('toast.saved') : ''}</span>
     </div>
     <div class="result-text">{result.text}</div>
